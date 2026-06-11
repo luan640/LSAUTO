@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import {
+  startOfDay,
   startOfMonth,
   startOfYear,
+  subDays,
   subMonths,
   isAfter,
   isEqual,
@@ -40,15 +42,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateInput } from "@/components/ui/date-input";
 import { formatCurrency } from "@/lib/format";
 import type { Sale } from "@/lib/types";
 
 const PERIODS = {
+  hoje: "Hoje",
+  ontem: "Ontem",
   mes_atual: "Mês atual",
   ultimos_3_meses: "Últimos 3 meses",
   ultimos_6_meses: "Últimos 6 meses",
   este_ano: "Este ano",
   tudo: "Tudo",
+  personalizado: "Personalizado",
 } as const;
 
 type PeriodKey = keyof typeof PERIODS;
@@ -74,15 +80,36 @@ function periodStart(period: PeriodKey): Date | null {
 
 export function DashboardView({ sales }: { sales: Sale[] }) {
   const [period, setPeriod] = useState<PeriodKey>("ultimos_6_meses");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   const filtered = useMemo(() => {
+    if (period === "hoje") {
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      return sales.filter((sale) => sale.sale_date === todayStr);
+    }
+
+    if (period === "ontem") {
+      const yesterdayStr = format(subDays(new Date(), 1), "yyyy-MM-dd");
+      return sales.filter((sale) => sale.sale_date === yesterdayStr);
+    }
+
+    if (period === "personalizado") {
+      if (!customStart && !customEnd) return sales;
+      return sales.filter((sale) => {
+        if (customStart && sale.sale_date < customStart) return false;
+        if (customEnd && sale.sale_date > customEnd) return false;
+        return true;
+      });
+    }
+
     const start = periodStart(period);
     if (!start) return sales;
     return sales.filter((sale) => {
       const date = parseISO(sale.sale_date);
       return isAfter(date, start) || isEqual(date, start);
     });
-  }, [sales, period]);
+  }, [sales, period, customStart, customEnd]);
 
   const summary = useMemo(() => {
     const totalSales = filtered.reduce((acc, s) => acc + s.sale_value, 0);
@@ -129,8 +156,22 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
     const dates = filtered.map((sale) => parseISO(sale.sale_date));
     const earliest = dates.reduce((a, b) => (a < b ? a : b));
     const today = new Date();
-    const start = periodStart(period) ?? earliest;
-    const end = isAfter(today, earliest) ? today : earliest;
+
+    let start: Date;
+    let end: Date;
+    if (period === "hoje") {
+      start = startOfDay(today);
+      end = startOfDay(today);
+    } else if (period === "ontem") {
+      start = startOfDay(subDays(today, 1));
+      end = startOfDay(subDays(today, 1));
+    } else if (period === "personalizado") {
+      start = customStart ? parseISO(customStart) : earliest;
+      end = customEnd ? parseISO(customEnd) : isAfter(today, earliest) ? today : earliest;
+    } else {
+      start = periodStart(period) ?? earliest;
+      end = isAfter(today, earliest) ? today : earliest;
+    }
 
     return eachDayOfInterval({ start, end }).map((date) => {
       const key = format(date, "yyyy-MM-dd");
@@ -140,7 +181,7 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
         ...value,
       };
     });
-  }, [filtered, period]);
+  }, [filtered, period, customStart, customEnd]);
 
   const byPaymentMethod = useMemo(() => {
     const map = new Map<string, number>();
@@ -161,20 +202,35 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-xl font-semibold md:text-2xl">Painel</h1>
-        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(PERIODS).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(PERIODS).map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {period === "personalizado" && (
+            <div className="flex items-center gap-2">
+              <DateInput
+                id="dashboard_date_from"
+                onValueChange={setCustomStart}
+              />
+              <span className="text-sm text-muted-foreground">até</span>
+              <DateInput
+                id="dashboard_date_to"
+                onValueChange={setCustomEnd}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -1,12 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Filter, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/date-input";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -37,6 +45,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
   const [dateTo, setDateTo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>(ALL_PAYMENT_METHODS);
   const [product, setProduct] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   function openNew() {
     setEditingSale(null);
@@ -69,6 +78,23 @@ export function SalesView({ sales }: { sales: Sale[] }) {
     0,
   );
 
+  const activeFiltersCount = [
+    dateFrom,
+    dateTo,
+    paymentMethod !== ALL_PAYMENT_METHODS ? paymentMethod : "",
+    product,
+  ].filter(Boolean).length;
+
+  const [filterResetKey, setFilterResetKey] = useState(0);
+
+  function clearFilters() {
+    setDateFrom("");
+    setDateTo("");
+    setPaymentMethod(ALL_PAYMENT_METHODS);
+    setProduct("");
+    setFilterResetKey((key) => key + 1);
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex items-center justify-between">
@@ -87,15 +113,24 @@ export function SalesView({ sales }: { sales: Sale[] }) {
         </Card>
       ) : (
         <>
-          <Card>
+          {/* Filtros: desktop inline */}
+          <Card className="hidden md:block">
             <CardContent className="grid grid-cols-2 gap-3 py-4 md:grid-cols-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="filter_date_from">De</Label>
-                <DateInput id="filter_date_from" onValueChange={setDateFrom} />
+                <DateInput
+                  key={`from-${filterResetKey}`}
+                  id="filter_date_from"
+                  onValueChange={setDateFrom}
+                />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="filter_date_to">Até</Label>
-                <DateInput id="filter_date_to" onValueChange={setDateTo} />
+                <DateInput
+                  key={`to-${filterResetKey}`}
+                  id="filter_date_to"
+                  onValueChange={setDateTo}
+                />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="filter_payment">Pagamento</Label>
@@ -128,14 +163,93 @@ export function SalesView({ sales }: { sales: Sale[] }) {
             </CardContent>
           </Card>
 
-          {/* Mobile: cards */}
+          {/* Mobile: lucro total + filtro */}
           <div className="flex items-center justify-between md:hidden">
             <span className="text-sm font-medium text-muted-foreground">
               Lucro total
             </span>
-            <span className="text-base font-semibold">
-              {formatCurrency(totalProfit)}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-base font-semibold">
+                {formatCurrency(totalProfit)}
+              </span>
+              <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                <SheetTrigger
+                  render={<Button variant="outline" size="icon" className="relative" />}
+                >
+                  <Filter className="size-4" />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                  <span className="sr-only">Filtros</span>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-xl" showCloseButton={false}>
+                  <SheetHeader className="flex-row items-center justify-between">
+                    <Button variant="link" className="px-0 text-destructive" onClick={clearFilters}>
+                      Limpar
+                    </Button>
+                    <SheetTitle>Filtros</SheetTitle>
+                    <SheetClose render={<Button variant="ghost" size="sm" className="px-0" />}>
+                      Fechar
+                    </SheetClose>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-4 px-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="filter_date_from_mobile">De</Label>
+                        <DateInput
+                          key={`from-mobile-${filterResetKey}`}
+                          id="filter_date_from_mobile"
+                          onValueChange={setDateFrom}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="filter_date_to_mobile">Até</Label>
+                        <DateInput
+                          key={`to-mobile-${filterResetKey}`}
+                          id="filter_date_to_mobile"
+                          onValueChange={setDateTo}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="filter_payment_mobile">Pagamento</Label>
+                      <Select
+                        value={paymentMethod}
+                        onValueChange={(value) => setPaymentMethod(value ?? ALL_PAYMENT_METHODS)}
+                      >
+                        <SelectTrigger id="filter_payment_mobile" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL_PAYMENT_METHODS}>Todos</SelectItem>
+                          {PAYMENT_METHODS.map((method) => (
+                            <SelectItem key={method} value={method}>
+                              {method}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="filter_product_mobile">Produto</Label>
+                      <Input
+                        id="filter_product_mobile"
+                        placeholder="Buscar produto"
+                        value={product}
+                        onChange={(e) => setProduct(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="p-4 pt-0">
+                    <SheetClose render={<Button className="w-full" />}>
+                      Aplicar{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
+                    </SheetClose>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
           {filteredSales.length === 0 && (
             <Card>
@@ -151,7 +265,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                 className="cursor-pointer"
                 onClick={() => openEdit(sale)}
               >
-                <CardContent className="flex flex-col gap-2 py-4">
+                <CardContent className="flex flex-col gap-3 py-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
                       {formatDate(sale.sale_date)}
@@ -160,17 +274,25 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                       {formatCurrency(sale.sale_value)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <Badge variant="secondary">{sale.payment_method}</Badge>
                     <Badge variant="outline">
                       {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
                     </Badge>
-                    <span className="ml-auto text-sm text-muted-foreground">
-                      Custo: {formatCurrency(sale.cost)}
-                    </span>
-                    <Badge variant="outline">
-                      {formatPercent(profitMargin(sale.sale_value, sale.cost))}
-                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">Custo</span>
+                      <span>{formatCurrency(sale.cost)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">Lucro</span>
+                      <span>{formatCurrency(sale.sale_value - sale.cost)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">% Lucro</span>
+                      <span>{formatPercent(profitMargin(sale.sale_value, sale.cost))}</span>
+                    </div>
                   </div>
                   {sale.products && (
                     <p className="line-clamp-2 text-sm text-muted-foreground">
