@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { createSale, updateSale, deleteSale } from "@/app/(app)/vendas/actions";
 import { PAYMENT_METHODS, type Sale } from "@/lib/types";
 
@@ -158,32 +158,14 @@ export function SaleFormDialog({
 
           <div className="flex flex-col gap-2">
             <Label>Entrega</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDelivery("retirada")}
-                className={cn(
-                  "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                  delivery === "retirada"
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                Retirada
-              </button>
-              <button
-                type="button"
-                onClick={() => setDelivery("frete")}
-                className={cn(
-                  "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                  delivery === "frete"
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                Frete (não cobrado)
-              </button>
-            </div>
+            <RadioGroup
+              value={delivery}
+              onValueChange={(value) => setDelivery(value as "retirada" | "frete")}
+              className="grid grid-cols-2 gap-2"
+            >
+              <RadioGroupItem value="retirada">Retirada</RadioGroupItem>
+              <RadioGroupItem value="frete">Frete (não cobrado)</RadioGroupItem>
+            </RadioGroup>
           </div>
 
           <div className="flex flex-col gap-2">
