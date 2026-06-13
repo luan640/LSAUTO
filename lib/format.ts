@@ -19,6 +19,6 @@ export function formatPercent(value: number) {
 }
 
 export function profitMargin(saleValue: number, cost: number) {
-  if (saleValue === 0) return 0;
-  return (saleValue - cost) / saleValue;
+  if (cost === 0) return 0;
+  return (saleValue - cost) / cost;
 }

@@ -71,3 +71,56 @@ create policy "Authenticated users can manage supplier accesses"
   to authenticated
   using (true)
   with check (true);
+
+-- Tabela de orçamentos (cabeçalho)
+create table if not exists public.budgets (
+  id uuid primary key default gen_random_uuid(),
+  client_phone text not null default '',
+  budget_date date not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists budgets_budget_date_idx on public.budgets (budget_date desc);
+
+drop trigger if exists set_budgets_updated_at on public.budgets;
+create trigger set_budgets_updated_at
+  before update on public.budgets
+  for each row
+  execute function public.set_updated_at();
+
+-- RLS: qualquer usuário autenticado pode ler/escrever todos os orçamentos
+alter table public.budgets enable row level security;
+
+drop policy if exists "Authenticated users can manage budgets" on public.budgets;
+create policy "Authenticated users can manage budgets"
+  on public.budgets
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Itens do orçamento (cada item pode ter referência e fornecedor diferentes)
+create table if not exists public.budget_items (
+  id uuid primary key default gen_random_uuid(),
+  budget_id uuid not null references public.budgets (id) on delete cascade,
+  product_reference text not null default '',
+  supplier_id uuid references public.supplier_accesses (id) on delete set null,
+  purchase_value numeric(10, 2) not null default 0,
+  sale_value numeric(10, 2) not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists budget_items_budget_id_idx on public.budget_items (budget_id);
+
+-- RLS: qualquer usuário autenticado pode ler/escrever todos os itens de orçamento
+alter table public.budget_items enable row level security;
+
+drop policy if exists "Authenticated users can manage budget items" on public.budget_items;
+create policy "Authenticated users can manage budget items"
+  on public.budget_items
+  for all
+  to authenticated
+  using (true)
+  with check (true);

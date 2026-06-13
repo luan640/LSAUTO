@@ -309,14 +309,14 @@ export function SalesView({ sales }: { sales: Sale[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                  <TableHead>Entrega</TableHead>
-                  <TableHead>Custo</TableHead>
-                  <TableHead>Lucro</TableHead>
-                  <TableHead>% Lucro</TableHead>
-                  <TableHead>Produtos</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Data</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Valor</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Pagamento</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Entrega</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Custo</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Lucro</TableHead>
+                  <TableHead className="text-base text-muted-foreground">% Lucro</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Produtos</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
