@@ -32,7 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency, formatDate, formatPercent, profitMargin } from "@/lib/format";
+import { formatCurrency, formatDate, formatPercent, profitMargin, salesMargin } from "@/lib/format";
 import { SaleFormDialog } from "./sale-form-dialog";
 import { PAYMENT_METHODS, type Sale } from "@/lib/types";
 
@@ -77,6 +77,24 @@ export function SalesView({ sales }: { sales: Sale[] }) {
     (acc, sale) => acc + (sale.sale_value - sale.cost),
     0,
   );
+
+  const totalValue = filteredSales.reduce((acc, sale) => acc + sale.sale_value, 0);
+
+  const totalCost = filteredSales.reduce((acc, sale) => acc + sale.cost, 0);
+
+  const avgProfitMargin = filteredSales.length
+    ? filteredSales.reduce(
+        (acc, sale) => acc + profitMargin(sale.sale_value, sale.cost),
+        0,
+      ) / filteredSales.length
+    : 0;
+
+  const avgSalesMargin = filteredSales.length
+    ? filteredSales.reduce(
+        (acc, sale) => acc + salesMargin(sale.sale_value, sale.cost),
+        0,
+      ) / filteredSales.length
+    : 0;
 
   const activeFiltersCount = [
     dateFrom,
@@ -280,7 +298,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                       {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-xs text-muted-foreground">Custo</span>
                       <span>{formatCurrency(sale.cost)}</span>
@@ -290,8 +308,12 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                       <span>{formatCurrency(sale.sale_value - sale.cost)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs text-muted-foreground">% Lucro</span>
+                      <span className="text-xs text-muted-foreground">% Markup</span>
                       <span>{formatPercent(profitMargin(sale.sale_value, sale.cost))}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">% Margem</span>
+                      <span>{formatPercent(salesMargin(sale.sale_value, sale.cost))}</span>
                     </div>
                   </div>
                   {sale.products && (
@@ -315,7 +337,8 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                   <TableHead className="text-base text-muted-foreground">Entrega</TableHead>
                   <TableHead className="text-base text-muted-foreground">Custo</TableHead>
                   <TableHead className="text-base text-muted-foreground">Lucro</TableHead>
-                  <TableHead className="text-base text-muted-foreground">% Lucro</TableHead>
+                  <TableHead className="text-base text-muted-foreground">% Markup</TableHead>
+                  <TableHead className="text-base text-muted-foreground">% Margem</TableHead>
                   <TableHead className="text-base text-muted-foreground">Produtos</TableHead>
                 </TableRow>
               </TableHeader>
@@ -339,6 +362,9 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                     <TableCell>
                       {formatPercent(profitMargin(sale.sale_value, sale.cost))}
                     </TableCell>
+                    <TableCell>
+                      {formatPercent(salesMargin(sale.sale_value, sale.cost))}
+                    </TableCell>
                     <TableCell className="max-w-[240px] truncate">
                       {sale.products}
                     </TableCell>
@@ -347,9 +373,14 @@ export function SalesView({ sales }: { sales: Sale[] }) {
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={5}>Total</TableCell>
-                  <TableCell>{formatCurrency(totalProfit)}</TableCell>
+                  <TableCell>Total</TableCell>
+                  <TableCell>{formatCurrency(totalValue)}</TableCell>
                   <TableCell colSpan={2} />
+                  <TableCell>{formatCurrency(totalCost)}</TableCell>
+                  <TableCell>{formatCurrency(totalProfit)}</TableCell>
+                  <TableCell>{formatPercent(avgProfitMargin)}</TableCell>
+                  <TableCell>{formatPercent(avgSalesMargin)}</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableFooter>
             </Table>

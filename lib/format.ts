@@ -22,3 +22,8 @@ export function profitMargin(saleValue: number, cost: number) {
   if (cost === 0) return 0;
   return (saleValue - cost) / cost;
 }
+
+export function salesMargin(saleValue: number, cost: number) {
+  if (saleValue === 0) return 0;
+  return (saleValue - cost) / saleValue;
+}
