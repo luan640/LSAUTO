@@ -124,3 +124,35 @@ create policy "Authenticated users can manage budget items"
   to authenticated
   using (true)
   with check (true);
+
+-- Tabela de despesas (cada despesa cobre um período de dias)
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  description text not null,
+  amount numeric(10, 2) not null default 0,
+  start_date date not null,
+  end_date date not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint expenses_period_check check (end_date >= start_date)
+);
+
+create index if not exists expenses_start_date_idx on public.expenses (start_date desc);
+
+drop trigger if exists set_expenses_updated_at on public.expenses;
+create trigger set_expenses_updated_at
+  before update on public.expenses
+  for each row
+  execute function public.set_updated_at();
+
+-- RLS: qualquer usuário autenticado pode ler/escrever todas as despesas
+alter table public.expenses enable row level security;
+
+drop policy if exists "Authenticated users can manage expenses" on public.expenses;
+create policy "Authenticated users can manage expenses"
+  on public.expenses
+  for all
+  to authenticated
+  using (true)
+  with check (true);

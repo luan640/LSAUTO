@@ -3,7 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReceiptText, LayoutDashboard, KeyRound, LogOut, Plus, FileText } from "lucide-react";
+import {
+  ReceiptText,
+  LayoutDashboard,
+  KeyRound,
+  LogOut,
+  Plus,
+  FileText,
+  Wallet,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(app)/actions";
 import { SaleFormDialog } from "@/components/sales/sale-form-dialog";
@@ -11,6 +19,7 @@ import { SaleFormDialog } from "@/components/sales/sale-form-dialog";
 const NAV_ITEMS = [
   { href: "/vendas", label: "Vendas", icon: ReceiptText },
   { href: "/orcamentos", label: "Orçamentos", icon: FileText },
+  { href: "/despesas", label: "Despesas", icon: Wallet },
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/fornecedores", label: "Fornecedores", icon: KeyRound },
 ];

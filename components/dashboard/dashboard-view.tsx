@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { formatCurrency } from "@/lib/format";
-import type { Sale } from "@/lib/types";
+import type { Expense, Sale } from "@/lib/types";
 
 const PERIODS = {
   hoje: "Hoje",
@@ -78,8 +78,36 @@ function periodStart(period: PeriodKey): Date | null {
   }
 }
 
-export function DashboardView({ sales }: { sales: Sale[] }) {
-  const [period, setPeriod] = useState<PeriodKey>("ultimos_6_meses");
+function periodRange(
+  period: PeriodKey,
+  customStart: string,
+  customEnd: string,
+): { start: string | null; end: string | null } {
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  if (period === "hoje") {
+    return { start: todayStr, end: todayStr };
+  }
+
+  if (period === "ontem") {
+    const yesterdayStr = format(subDays(new Date(), 1), "yyyy-MM-dd");
+    return { start: yesterdayStr, end: yesterdayStr };
+  }
+
+  if (period === "personalizado") {
+    return { start: customStart || null, end: customEnd || null };
+  }
+
+  if (period === "tudo") {
+    return { start: null, end: null };
+  }
+
+  const start = periodStart(period);
+  return { start: start ? format(start, "yyyy-MM-dd") : null, end: todayStr };
+}
+
+export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Expense[] }) {
+  const [period, setPeriod] = useState<PeriodKey>("mes_atual");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
@@ -111,16 +139,30 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
     });
   }, [sales, period, customStart, customEnd]);
 
+  const filteredExpenses = useMemo(() => {
+    const { start, end } = periodRange(period, customStart, customEnd);
+    return expenses.filter((expense) => {
+      if (start && expense.end_date < start) return false;
+      if (end && expense.start_date > end) return false;
+      return true;
+    });
+  }, [expenses, period, customStart, customEnd]);
+
+  const totalExpenses = useMemo(
+    () => filteredExpenses.reduce((acc, expense) => acc + expense.amount, 0),
+    [filteredExpenses],
+  );
+
   const summary = useMemo(() => {
     const totalSales = filtered.reduce((acc, s) => acc + s.sale_value, 0);
     const totalCost = filtered.reduce((acc, s) => acc + s.cost, 0);
     return {
       totalSales,
       totalCost,
-      profit: totalSales - totalCost,
+      profit: totalSales - totalCost - totalExpenses,
       count: filtered.length,
     };
-  }, [filtered]);
+  }, [filtered, totalExpenses]);
 
   const monthly = useMemo(() => {
     const map = new Map<string, { revenue: number; profit: number }>();
@@ -233,7 +275,7 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -257,11 +299,26 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Lucro
+              Despesas
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xl font-semibold md:text-2xl">
-            {formatCurrency(summary.profit)}
+            {formatCurrency(totalExpenses)}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Lucro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span className="text-xl font-semibold md:text-2xl">
+              {formatCurrency(summary.profit)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Faturamento - Custo - Despesas
+            </span>
           </CardContent>
         </Card>
         <Card>
@@ -275,33 +332,6 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Evolução de faturamento e lucro</CardTitle>
-        </CardHeader>
-        <CardContent className="h-72">
-          {monthly.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sem dados para o período.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" fontSize={12} />
-                <YAxis
-                  fontSize={12}
-                  tickFormatter={(value) => formatCurrency(value as number)}
-                  width={90}
-                />
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Legend />
-                <Bar dataKey="revenue" name="Faturamento" fill="#6366f1" radius={4} />
-                <Bar dataKey="profit" name="Lucro" fill="#22c55e" radius={4} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -339,6 +369,33 @@ export function DashboardView({ sales }: { sales: Sale[] }) {
                   dot={false}
                 />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Evolução de faturamento e lucro</CardTitle>
+        </CardHeader>
+        <CardContent className="h-72">
+          {monthly.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem dados para o período.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthly}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" fontSize={12} />
+                <YAxis
+                  fontSize={12}
+                  tickFormatter={(value) => formatCurrency(value as number)}
+                  width={90}
+                />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Legend />
+                <Bar dataKey="revenue" name="Faturamento" fill="#6366f1" radius={4} />
+                <Bar dataKey="profit" name="Lucro" fill="#22c55e" radius={4} />
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>
