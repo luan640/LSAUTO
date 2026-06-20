@@ -11,6 +11,7 @@ import {
   Plus,
   FileText,
   Wallet,
+  Bike,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(app)/actions";
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { href: "/despesas", label: "Despesas", icon: Wallet },
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/fornecedores", label: "Fornecedores", icon: KeyRound },
+  { href: "/cf-motos", label: "CF Motos", icon: Bike },
 ];
 
 export function AppShell({

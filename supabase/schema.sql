@@ -156,3 +156,35 @@ create policy "Authenticated users can manage expenses"
   to authenticated
   using (true)
   with check (true);
+
+-- Tabela de vendas da CF Motos (tela independente, sem vínculo com as demais)
+create table if not exists public.cf_moto_sales (
+  id uuid primary key default gen_random_uuid(),
+  sale_date date not null,
+  sale_value numeric(10, 2) not null default 0,
+  cost numeric(10, 2) not null default 0,
+  shopee_fee numeric(10, 2) not null default 0,
+  product_reference text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists cf_moto_sales_sale_date_idx on public.cf_moto_sales (sale_date desc);
+
+drop trigger if exists set_cf_moto_sales_updated_at on public.cf_moto_sales;
+create trigger set_cf_moto_sales_updated_at
+  before update on public.cf_moto_sales
+  for each row
+  execute function public.set_updated_at();
+
+-- RLS: qualquer usuário autenticado pode ler/escrever todas as vendas da CF Motos
+alter table public.cf_moto_sales enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto sales" on public.cf_moto_sales;
+create policy "Authenticated users can manage cf moto sales"
+  on public.cf_moto_sales
+  for all
+  to authenticated
+  using (true)
+  with check (true);

@@ -75,3 +75,20 @@ export type Expense = {
 };
 
 export type ExpenseInput = Omit<Expense, "id" | "created_by" | "created_at" | "updated_at">;
+
+export type CfMotoSale = {
+  id: string;
+  sale_date: string;
+  sale_value: number;
+  cost: number;
+  shopee_fee: number;
+  product_reference: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CfMotoSaleInput = Omit<
+  CfMotoSale,
+  "id" | "created_by" | "created_at" | "updated_at"
+>;
