@@ -29,16 +29,25 @@ export function CfMotoSaleFormDialog({
   open,
   onOpenChange,
   sale,
+  existingLinks,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sale: CfMotoSale | null;
+  existingLinks: string[];
 }) {
   const [isPending, startTransition] = useTransition();
 
   const isEditing = !!sale;
 
   function handleSubmit(formData: FormData) {
+    const link = String(formData.get("product_reference") ?? "").trim();
+
+    if (link && existingLinks.includes(link)) {
+      toast.error("Este link de venda já foi cadastrado");
+      return;
+    }
+
     startTransition(async () => {
       try {
         if (isEditing) {

@@ -7,7 +7,8 @@ export default async function CfMotosPage() {
   const { data, error } = await supabase
     .from("cf_moto_sales")
     .select("*")
-    .order("sale_date", { ascending: true });
+    .order("sale_date", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(error.message);

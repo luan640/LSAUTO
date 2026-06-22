@@ -172,6 +172,11 @@ create table if not exists public.cf_moto_sales (
 
 create index if not exists cf_moto_sales_sale_date_idx on public.cf_moto_sales (sale_date desc);
 
+-- Impede cadastrar o mesmo link de venda mais de uma vez (ignora valores vazios)
+create unique index if not exists cf_moto_sales_product_reference_unique_idx
+  on public.cf_moto_sales (product_reference)
+  where product_reference <> '';
+
 drop trigger if exists set_cf_moto_sales_updated_at on public.cf_moto_sales;
 create trigger set_cf_moto_sales_updated_at
   before update on public.cf_moto_sales
