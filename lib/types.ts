@@ -103,6 +103,11 @@ export type ShopeeOrderRow = {
   shopee_fee_total: number | null;
   buyer_username: string;
   order_create_time: string | null;
+  product_cost: number | null;
   linked_cf_moto_sale_id: string | null;
   synced_at: string;
+  raw_payload: {
+    order?: { item_list?: { item_name: string; model_name?: string; model_quantity_purchased?: number }[] };
+    escrow?: unknown;
+  } | null;
 };

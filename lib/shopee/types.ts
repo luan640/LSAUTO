@@ -27,12 +27,19 @@ export type ShopeeOrderListItem = {
   order_sn: string;
 };
 
+export type ShopeeOrderItem = {
+  item_name: string;
+  model_name?: string;
+  model_quantity_purchased?: number;
+};
+
 export type ShopeeOrderDetail = {
   order_sn: string;
   order_status: string;
   total_amount: number;
   buyer_username: string;
   create_time: number;
+  item_list?: ShopeeOrderItem[];
 };
 
 export type ShopeeEscrowDetail = {
