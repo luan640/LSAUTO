@@ -1,18 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { CfMotosView } from "@/components/cf-motos/cf-motos-view";
-import type { CfMotoSale } from "@/lib/types";
+import { redirect } from "next/navigation";
 
-export default async function CfMotosPage() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("cf_moto_sales")
-    .select("*")
-    .order("sale_date", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return <CfMotosView sales={(data ?? []) as CfMotoSale[]} />;
+export default function CfMotosPage() {
+  redirect("/cf-motos/vendas");
 }

@@ -46,7 +46,7 @@ function receivableOf(sale: CfMotoSale) {
   return sale.sale_value - sale.shopee_fee;
 }
 
-export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
+export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<CfMotoSale | null>(null);
   const [dateFrom, setDateFrom] = useState("");
@@ -108,7 +108,7 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold md:text-2xl">CF Motos</h1>
+        <h1 className="text-xl font-semibold md:text-2xl">CF Motos · Vendas</h1>
         <Button onClick={openNew}>
           <Plus className="size-4" />
           Nova venda

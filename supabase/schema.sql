@@ -193,3 +193,66 @@ create policy "Authenticated users can manage cf moto sales"
   to authenticated
   using (true)
   with check (true);
+
+-- Tabela de credenciais/tokens das lojas Shopee conectadas (Open Platform API v2).
+-- Nenhuma policy de RLS criada de propósito: nem anon nem authenticated têm
+-- acesso a esta tabela. Toda leitura/escrita passa pelo admin client
+-- (service role, server-only) em lib/supabase/admin.ts.
+create table if not exists public.shopee_shops (
+  id uuid primary key default gen_random_uuid(),
+  shop_id bigint not null unique,
+  shop_name text not null default '',
+  access_token text not null,
+  refresh_token text not null,
+  access_token_expires_at timestamptz not null,
+  refresh_token_expires_at timestamptz not null,
+  connected_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists set_shopee_shops_updated_at on public.shopee_shops;
+create trigger set_shopee_shops_updated_at
+  before update on public.shopee_shops
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.shopee_shops enable row level security;
+
+-- Pedidos sincronizados da Shopee (não sensíveis: leitura liberada a
+-- authenticated; escrita só via admin client, que é quem executa o sync).
+create table if not exists public.shopee_orders (
+  id uuid primary key default gen_random_uuid(),
+  shop_id bigint not null references public.shopee_shops (shop_id) on delete cascade,
+  order_sn text not null unique,
+  order_status text not null default '',
+  order_total numeric(10, 2) not null default 0,
+  escrow_amount numeric(10, 2),
+  shopee_fee_total numeric(10, 2),
+  buyer_username text not null default '',
+  order_create_time timestamptz,
+  raw_payload jsonb,
+  linked_cf_moto_sale_id uuid references public.cf_moto_sales (id) on delete set null,
+  synced_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists shopee_orders_shop_id_idx on public.shopee_orders (shop_id);
+create index if not exists shopee_orders_linked_idx on public.shopee_orders (linked_cf_moto_sale_id);
+
+drop trigger if exists set_shopee_orders_updated_at on public.shopee_orders;
+create trigger set_shopee_orders_updated_at
+  before update on public.shopee_orders
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.shopee_orders enable row level security;
+
+drop policy if exists "Authenticated users can read shopee orders" on public.shopee_orders;
+create policy "Authenticated users can read shopee orders"
+  on public.shopee_orders
+  for select
+  to authenticated
+  using (true);
+

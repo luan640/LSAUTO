@@ -92,3 +92,17 @@ export type CfMotoSaleInput = Omit<
   CfMotoSale,
   "id" | "created_by" | "created_at" | "updated_at"
 >;
+
+export type ShopeeOrderRow = {
+  id: string;
+  shop_id: number;
+  order_sn: string;
+  order_status: string;
+  order_total: number;
+  escrow_amount: number | null;
+  shopee_fee_total: number | null;
+  buyer_username: string;
+  order_create_time: string | null;
+  linked_cf_moto_sale_id: string | null;
+  synced_at: string;
+};

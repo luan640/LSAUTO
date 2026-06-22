@@ -12,18 +12,37 @@ import {
   FileText,
   Wallet,
   Bike,
+  Plug,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(app)/actions";
 import { SaleFormDialog } from "@/components/sales/sale-form-dialog";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  children?: { href: string; label: string }[];
+};
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/vendas", label: "Vendas", icon: ReceiptText },
   { href: "/orcamentos", label: "Orçamentos", icon: FileText },
   { href: "/despesas", label: "Despesas", icon: Wallet },
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/fornecedores", label: "Fornecedores", icon: KeyRound },
-  { href: "/cf-motos", label: "CF Motos", icon: Bike },
+  {
+    href: "/cf-motos",
+    label: "CF Motos",
+    icon: Bike,
+    children: [
+      { href: "/cf-motos/vendas", label: "Vendas" },
+      { href: "/cf-motos/vendas-shopee", label: "Vendas Shopee" },
+    ],
+  },
+  { href: "/integracoes", label: "Integrações", icon: Plug },
 ];
 
 export function AppShell({
@@ -35,6 +54,9 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [newSaleOpen, setNewSaleOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(
+    NAV_ITEMS.find((item) => "children" in item && pathname.startsWith(item.href))?.href ?? null,
+  );
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -47,20 +69,67 @@ export function AppShell({
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.href);
+
+            if (!item.children) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {item.label}
+                </Link>
+              );
+            }
+
+            const isExpanded = expanded === item.href;
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              <div key={item.href} className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(isExpanded ? null : item.href)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <ChevronDown
+                    className={cn("size-4 transition-transform", isExpanded && "rotate-180")}
+                  />
+                </button>
+                {isExpanded && (
+                  <div className="ml-4 mt-1 flex flex-col gap-1 border-l pl-3">
+                    {item.children.map((child) => {
+                      const childActive = pathname.startsWith(child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                            childActive
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
+              </div>
             );
           })}
         </nav>

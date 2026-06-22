@@ -30,8 +30,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const isPublicApiRoute = request.nextUrl.pathname.startsWith("/api/shopee/");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
