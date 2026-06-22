@@ -42,6 +42,10 @@ function marginPercent(sale: CfMotoSale) {
   return profitOf(sale) / sale.sale_value;
 }
 
+function receivableOf(sale: CfMotoSale) {
+  return sale.sale_value - sale.shopee_fee;
+}
+
 export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<CfMotoSale | null>(null);
@@ -85,6 +89,7 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
   const totalSaleValue = filteredSales.reduce((acc, sale) => acc + sale.sale_value, 0);
   const totalCost = filteredSales.reduce((acc, sale) => acc + sale.cost, 0);
   const totalShopeeFee = filteredSales.reduce((acc, sale) => acc + sale.shopee_fee, 0);
+  const totalReceivable = sales.reduce((acc, sale) => acc + receivableOf(sale), 0);
   const totalProfit = filteredSales.reduce((acc, sale) => acc + profitOf(sale), 0);
   const avgShopeeFeePercent = totalSaleValue ? totalShopeeFee / totalSaleValue : 0;
   const avgMarginPercent = totalSaleValue ? totalProfit / totalSaleValue : 0;
@@ -248,6 +253,10 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
                       <span>{formatCurrency(sale.shopee_fee)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">Valor a receber</span>
+                      <span>{formatCurrency(receivableOf(sale))}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
                       <span className="text-xs text-muted-foreground">Lucro</span>
                       <span>{formatCurrency(profitOf(sale))}</span>
                     </div>
@@ -285,6 +294,7 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
                   <TableHead>Valor de venda</TableHead>
                   <TableHead>Custo</TableHead>
                   <TableHead>Taxas Shopee</TableHead>
+                  <TableHead>Valor a receber</TableHead>
                   <TableHead>Lucro</TableHead>
                   <TableHead>% Taxas Shopee</TableHead>
                   <TableHead>% Margem</TableHead>
@@ -302,6 +312,7 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
                     <TableCell>{formatCurrency(sale.sale_value)}</TableCell>
                     <TableCell>{formatCurrency(sale.cost)}</TableCell>
                     <TableCell>{formatCurrency(sale.shopee_fee)}</TableCell>
+                    <TableCell>{formatCurrency(receivableOf(sale))}</TableCell>
                     <TableCell>{formatCurrency(profitOf(sale))}</TableCell>
                     <TableCell>{formatPercent(shopeeFeePercent(sale))}</TableCell>
                     <TableCell>{formatPercent(marginPercent(sale))}</TableCell>
@@ -329,6 +340,7 @@ export function CfMotosView({ sales }: { sales: CfMotoSale[] }) {
                   <TableCell>{formatCurrency(totalSaleValue)}</TableCell>
                   <TableCell>{formatCurrency(totalCost)}</TableCell>
                   <TableCell>{formatCurrency(totalShopeeFee)}</TableCell>
+                  <TableCell>{formatCurrency(totalReceivable)}</TableCell>
                   <TableCell>{formatCurrency(totalProfit)}</TableCell>
                   <TableCell>{formatPercent(avgShopeeFeePercent)}</TableCell>
                   <TableCell>{formatPercent(avgMarginPercent)}</TableCell>
