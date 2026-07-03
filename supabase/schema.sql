@@ -233,6 +233,7 @@ create table if not exists public.shopee_orders (
   buyer_username text not null default '',
   order_create_time timestamptz,
   raw_payload jsonb,
+  product_cost numeric(10, 2),
   linked_cf_moto_sale_id uuid references public.cf_moto_sales (id) on delete set null,
   synced_at timestamptz not null default now(),
   created_at timestamptz not null default now(),

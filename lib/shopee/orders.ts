@@ -85,7 +85,7 @@ export async function syncOrders(shopId: number) {
       shop,
       {
         order_sn_list: batch.join(","),
-        response_optional_fields: "buyer_username,total_amount,create_time,order_status",
+        response_optional_fields: "buyer_username,total_amount,create_time,order_status,item_list",
       },
     );
 

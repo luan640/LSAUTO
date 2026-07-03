@@ -129,6 +129,20 @@ export async function importShopeeOrderToSale(shopeeOrderId: string) {
   revalidatePath("/cf-motos/vendas-shopee");
 }
 
+export async function updateShopeeOrderProductCost(orderId: string, cost: number | null) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("shopee_orders")
+    .update({ product_cost: cost })
+    .eq("id", orderId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/cf-motos/vendas-shopee");
+}
+
 export async function syncShopeeOrders() {
   const shop = await getConnectedShop();
   if (!shop) {
