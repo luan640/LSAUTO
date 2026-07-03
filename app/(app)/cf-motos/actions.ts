@@ -5,15 +5,20 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConnectedShop } from "@/lib/shopee/tokens";
 import { syncOrders } from "@/lib/shopee/orders";
-import type { CfMotoSaleInput } from "@/lib/types";
+import { CF_MOTO_SALE_STATUSES, type CfMotoSaleInput, type CfMotoSaleStatus } from "@/lib/types";
 
 function parseCfMotoSaleInput(formData: FormData): CfMotoSaleInput {
+  const status = String(formData.get("status") ?? "");
+
   return {
     sale_date: String(formData.get("sale_date") ?? ""),
     sale_value: Number(formData.get("sale_value")) || 0,
     cost: Number(formData.get("cost")) || 0,
     shopee_fee: Number(formData.get("shopee_fee")) || 0,
     product_reference: String(formData.get("product_reference") ?? "").trim(),
+    status: (CF_MOTO_SALE_STATUSES as readonly string[]).includes(status)
+      ? (status as CfMotoSaleStatus)
+      : "finalizado",
   };
 }
 

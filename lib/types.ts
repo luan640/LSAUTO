@@ -76,6 +76,10 @@ export type Expense = {
 
 export type ExpenseInput = Omit<Expense, "id" | "created_by" | "created_at" | "updated_at">;
 
+export const CF_MOTO_SALE_STATUSES = ["finalizado", "cancelado"] as const;
+
+export type CfMotoSaleStatus = (typeof CF_MOTO_SALE_STATUSES)[number];
+
 export type CfMotoSale = {
   id: string;
   sale_date: string;
@@ -83,6 +87,7 @@ export type CfMotoSale = {
   cost: number;
   shopee_fee: number;
   product_reference: string;
+  status: CfMotoSaleStatus;
   created_by: string;
   created_at: string;
   updated_at: string;

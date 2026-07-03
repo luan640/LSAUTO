@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Filter, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,22 @@ function receivableOf(sale: CfMotoSale) {
   return sale.sale_value - sale.shopee_fee;
 }
 
+function StatusBadge({ status }: { status: CfMotoSale["status"] }) {
+  return (
+    <Badge variant={status === "cancelado" ? "destructive" : "default"}>
+      {status === "cancelado" ? "Cancelado" : "Finalizado"}
+    </Badge>
+  );
+}
+
+const FILTERS_STORAGE_KEY = "cf-motos:vendas:filters";
+
+type StoredFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  link?: string;
+};
+
 export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<CfMotoSale | null>(null);
@@ -86,17 +103,45 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
     [sales, editingSale],
   );
 
-  const totalSaleValue = filteredSales.reduce((acc, sale) => acc + sale.sale_value, 0);
-  const totalCost = filteredSales.reduce((acc, sale) => acc + sale.cost, 0);
-  const totalShopeeFee = filteredSales.reduce((acc, sale) => acc + sale.shopee_fee, 0);
-  const totalReceivable = sales.reduce((acc, sale) => acc + receivableOf(sale), 0);
-  const totalProfit = filteredSales.reduce((acc, sale) => acc + profitOf(sale), 0);
+  const countedSales = useMemo(
+    () => filteredSales.filter((sale) => sale.status !== "cancelado"),
+    [filteredSales],
+  );
+
+  const totalSaleValue = countedSales.reduce((acc, sale) => acc + sale.sale_value, 0);
+  const totalCost = countedSales.reduce((acc, sale) => acc + sale.cost, 0);
+  const totalShopeeFee = countedSales.reduce((acc, sale) => acc + sale.shopee_fee, 0);
+  const totalReceivable = countedSales.reduce((acc, sale) => acc + receivableOf(sale), 0);
+  const totalProfit = countedSales.reduce((acc, sale) => acc + profitOf(sale), 0);
   const avgShopeeFeePercent = totalSaleValue ? totalShopeeFee / totalSaleValue : 0;
   const avgMarginPercent = totalSaleValue ? totalProfit / totalSaleValue : 0;
 
   const activeFiltersCount = [dateFrom, dateTo, link].filter(Boolean).length;
 
   const [filterResetKey, setFilterResetKey] = useState(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (!raw) return;
+      const stored = JSON.parse(raw) as StoredFilters;
+      setDateFrom(stored.dateFrom ?? "");
+      setDateTo(stored.dateTo ?? "");
+      setLink(stored.link ?? "");
+      setFilterResetKey((key) => key + 1);
+    } catch {
+      // ignora filtros salvos inválidos
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored: StoredFilters = { dateFrom, dateTo, link };
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(stored));
+    } catch {
+      // localStorage indisponível (ex: modo privado)
+    }
+  }, [dateFrom, dateTo, link]);
 
   function clearFilters() {
     setDateFrom("");
@@ -131,6 +176,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                 <DateInput
                   key={`from-${filterResetKey}`}
                   id="filter_date_from"
+                  defaultValue={dateFrom}
                   onValueChange={setDateFrom}
                 />
               </div>
@@ -139,6 +185,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                 <DateInput
                   key={`to-${filterResetKey}`}
                   id="filter_date_to"
+                  defaultValue={dateTo}
                   onValueChange={setDateTo}
                 />
               </div>
@@ -188,6 +235,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                         <DateInput
                           key={`from-mobile-${filterResetKey}`}
                           id="filter_date_from_mobile"
+                          defaultValue={dateFrom}
                           onValueChange={setDateFrom}
                         />
                       </div>
@@ -196,6 +244,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                         <DateInput
                           key={`to-mobile-${filterResetKey}`}
                           id="filter_date_to_mobile"
+                          defaultValue={dateTo}
                           onValueChange={setDateTo}
                         />
                       </div>
@@ -243,6 +292,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                       {formatCurrency(sale.sale_value)}
                     </span>
                   </div>
+                  <StatusBadge status={sale.status} />
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-xs text-muted-foreground">Custo</span>
@@ -299,6 +349,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                   <TableHead>% Taxas Shopee</TableHead>
                   <TableHead>% Margem</TableHead>
                   <TableHead>Link da venda</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -331,6 +382,9 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                         "-"
                       )}
                     </TableCell>
+                    <TableCell>
+                      <StatusBadge status={sale.status} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -344,6 +398,7 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                   <TableCell>{formatCurrency(totalProfit)}</TableCell>
                   <TableCell>{formatPercent(avgShopeeFeePercent)}</TableCell>
                   <TableCell>{formatPercent(avgMarginPercent)}</TableCell>
+                  <TableCell />
                   <TableCell />
                 </TableRow>
               </TableFooter>

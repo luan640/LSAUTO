@@ -165,6 +165,7 @@ create table if not exists public.cf_moto_sales (
   cost numeric(10, 2) not null default 0,
   shopee_fee numeric(10, 2) not null default 0,
   product_reference text not null default '',
+  status text not null default 'finalizado' check (status in ('finalizado', 'cancelado')),
   created_by uuid references auth.users (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

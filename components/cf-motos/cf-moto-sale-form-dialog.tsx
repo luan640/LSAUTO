@@ -15,11 +15,23 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   createCfMotoSale,
   updateCfMotoSale,
   deleteCfMotoSale,
 } from "@/app/(app)/cf-motos/actions";
 import type { CfMotoSale } from "@/lib/types";
+
+const STATUS_LABELS: Record<CfMotoSale["status"], string> = {
+  finalizado: "Finalizado",
+  cancelado: "Cancelado",
+};
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -137,6 +149,22 @@ export function CfMotoSaleFormDialog({
                 defaultValue={sale?.shopee_fee ?? ""}
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="status">Status</Label>
+            <Select name="status" defaultValue={sale?.status ?? "finalizado"} required>
+              <SelectTrigger id="status" className="w-full">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-2">
