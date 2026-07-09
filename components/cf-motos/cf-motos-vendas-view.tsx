@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Filter, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/date-input";
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
 import { CfMotoSaleFormDialog } from "./cf-moto-sale-form-dialog";
-import type { CfMotoSale } from "@/lib/types";
+import type { CfMotoExpense, CfMotoSale } from "@/lib/types";
 
 function profitOf(sale: CfMotoSale) {
   return sale.sale_value - sale.cost - sale.shopee_fee;
@@ -63,11 +63,27 @@ type StoredFilters = {
   link?: string;
 };
 
-export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
+function currentMonthRange() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: toIso(from), to: toIso(to) };
+}
+
+export function CfMotosVendasView({
+  sales,
+  expenses,
+}: {
+  sales: CfMotoSale[];
+  expenses: CfMotoExpense[];
+}) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<CfMotoSale | null>(null);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const defaultRange = useMemo(() => currentMonthRange(), []);
+  const [dateFrom, setDateFrom] = useState(defaultRange.from);
+  const [dateTo, setDateTo] = useState(defaultRange.to);
   const [link, setLink] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -115,8 +131,24 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
   const totalProfit = countedSales.reduce((acc, sale) => acc + profitOf(sale), 0);
   const avgShopeeFeePercent = totalSaleValue ? totalShopeeFee / totalSaleValue : 0;
   const avgMarginPercent = totalSaleValue ? totalProfit / totalSaleValue : 0;
+  const orderCount = countedSales.length;
+  const canceledCount = filteredSales.length - countedSales.length;
 
-  const activeFiltersCount = [dateFrom, dateTo, link].filter(Boolean).length;
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((expense) => {
+      if (dateFrom && expense.end_date < dateFrom) return false;
+      if (dateTo && expense.start_date > dateTo) return false;
+      return true;
+    });
+  }, [expenses, dateFrom, dateTo]);
+
+  const totalExpenses = filteredExpenses.reduce((acc, expense) => acc + expense.amount, 0);
+
+  const activeFiltersCount = [
+    dateFrom !== defaultRange.from ? dateFrom : "",
+    dateTo !== defaultRange.to ? dateTo : "",
+    link,
+  ].filter(Boolean).length;
 
   const [filterResetKey, setFilterResetKey] = useState(0);
 
@@ -125,14 +157,14 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
       const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
       if (!raw) return;
       const stored = JSON.parse(raw) as StoredFilters;
-      setDateFrom(stored.dateFrom ?? "");
-      setDateTo(stored.dateTo ?? "");
+      setDateFrom(stored.dateFrom ?? defaultRange.from);
+      setDateTo(stored.dateTo ?? defaultRange.to);
       setLink(stored.link ?? "");
       setFilterResetKey((key) => key + 1);
     } catch {
       // ignora filtros salvos inválidos
     }
-  }, []);
+  }, [defaultRange]);
 
   useEffect(() => {
     try {
@@ -144,8 +176,8 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
   }, [dateFrom, dateTo, link]);
 
   function clearFilters() {
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(defaultRange.from);
+    setDateTo(defaultRange.to);
     setLink("");
     setFilterResetKey((key) => key + 1);
   }
@@ -267,6 +299,60 @@ export function CfMotosVendasView({ sales }: { sales: CfMotoSale[] }) {
                 </SheetContent>
               </Sheet>
             </div>
+          </div>
+
+          {/* Resumo do período filtrado */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Faturamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xl font-semibold md:text-2xl">
+                {formatCurrency(totalSaleValue)}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Despesa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xl font-semibold md:text-2xl">
+                {formatCurrency(totalExpenses)}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Lucro
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xl font-semibold md:text-2xl">
+                {formatCurrency(totalProfit)}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Vendas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xl font-semibold md:text-2xl">
+                {orderCount}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pedidos cancelados
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xl font-semibold md:text-2xl">
+                {canceledCount}
+              </CardContent>
+            </Card>
           </div>
 
           {filteredSales.length === 0 && (

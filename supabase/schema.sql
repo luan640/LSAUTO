@@ -195,6 +195,38 @@ create policy "Authenticated users can manage cf moto sales"
   using (true)
   with check (true);
 
+-- Tabela de despesas da CF Motos (tela independente, sem vínculo com as demais despesas)
+create table if not exists public.cf_moto_expenses (
+  id uuid primary key default gen_random_uuid(),
+  description text not null,
+  amount numeric(10, 2) not null default 0,
+  start_date date not null,
+  end_date date not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint cf_moto_expenses_period_check check (end_date >= start_date)
+);
+
+create index if not exists cf_moto_expenses_start_date_idx on public.cf_moto_expenses (start_date desc);
+
+drop trigger if exists set_cf_moto_expenses_updated_at on public.cf_moto_expenses;
+create trigger set_cf_moto_expenses_updated_at
+  before update on public.cf_moto_expenses
+  for each row
+  execute function public.set_updated_at();
+
+-- RLS: qualquer usuário autenticado pode ler/escrever todas as despesas da CF Motos
+alter table public.cf_moto_expenses enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto expenses" on public.cf_moto_expenses;
+create policy "Authenticated users can manage cf moto expenses"
+  on public.cf_moto_expenses
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- Tabela de credenciais/tokens das lojas Shopee conectadas (Open Platform API v2).
 -- Nenhuma policy de RLS criada de propósito: nem anon nem authenticated têm
 -- acesso a esta tabela. Toda leitura/escrita passa pelo admin client

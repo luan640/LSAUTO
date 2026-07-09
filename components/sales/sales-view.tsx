@@ -38,11 +38,21 @@ import { PAYMENT_METHODS, type Sale } from "@/lib/types";
 
 const ALL_PAYMENT_METHODS = "todos";
 
+function currentMonthRange() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: toIso(from), to: toIso(to) };
+}
+
 export function SalesView({ sales }: { sales: Sale[] }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const defaultRange = useMemo(() => currentMonthRange(), []);
+  const [dateFrom, setDateFrom] = useState(defaultRange.from);
+  const [dateTo, setDateTo] = useState(defaultRange.to);
   const [paymentMethod, setPaymentMethod] = useState<string>(ALL_PAYMENT_METHODS);
   const [product, setProduct] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -97,8 +107,8 @@ export function SalesView({ sales }: { sales: Sale[] }) {
     : 0;
 
   const activeFiltersCount = [
-    dateFrom,
-    dateTo,
+    dateFrom !== defaultRange.from ? dateFrom : "",
+    dateTo !== defaultRange.to ? dateTo : "",
     paymentMethod !== ALL_PAYMENT_METHODS ? paymentMethod : "",
     product,
   ].filter(Boolean).length;
@@ -106,8 +116,8 @@ export function SalesView({ sales }: { sales: Sale[] }) {
   const [filterResetKey, setFilterResetKey] = useState(0);
 
   function clearFilters() {
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(defaultRange.from);
+    setDateTo(defaultRange.to);
     setPaymentMethod(ALL_PAYMENT_METHODS);
     setProduct("");
     setFilterResetKey((key) => key + 1);
@@ -139,6 +149,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                 <DateInput
                   key={`from-${filterResetKey}`}
                   id="filter_date_from"
+                  defaultValue={dateFrom}
                   onValueChange={setDateFrom}
                 />
               </div>
@@ -147,6 +158,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                 <DateInput
                   key={`to-${filterResetKey}`}
                   id="filter_date_to"
+                  defaultValue={dateTo}
                   onValueChange={setDateTo}
                 />
               </div>
@@ -219,6 +231,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                         <DateInput
                           key={`from-mobile-${filterResetKey}`}
                           id="filter_date_from_mobile"
+                          defaultValue={dateFrom}
                           onValueChange={setDateFrom}
                         />
                       </div>
@@ -227,6 +240,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                         <DateInput
                           key={`to-mobile-${filterResetKey}`}
                           id="filter_date_to_mobile"
+                          defaultValue={dateTo}
                           onValueChange={setDateTo}
                         />
                       </div>

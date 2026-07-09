@@ -98,6 +98,22 @@ export type CfMotoSaleInput = Omit<
   "id" | "created_by" | "created_at" | "updated_at"
 >;
 
+export type CfMotoExpense = {
+  id: string;
+  description: string;
+  amount: number;
+  start_date: string;
+  end_date: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CfMotoExpenseInput = Omit<
+  CfMotoExpense,
+  "id" | "created_by" | "created_at" | "updated_at"
+>;
+
 export type ShopeeOrderRow = {
   id: string;
   shop_id: number;
