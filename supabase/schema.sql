@@ -290,3 +290,142 @@ create policy "Authenticated users can read shopee orders"
   to authenticated
   using (true);
 
+-- Produtos da CF Motos (módulo de estoque, exclusivo desta loja)
+create table if not exists public.cf_moto_products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  sku text not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists cf_moto_products_sku_unique_idx
+  on public.cf_moto_products (sku)
+  where sku <> '';
+
+create index if not exists cf_moto_products_name_idx on public.cf_moto_products (name);
+
+drop trigger if exists set_cf_moto_products_updated_at on public.cf_moto_products;
+create trigger set_cf_moto_products_updated_at
+  before update on public.cf_moto_products
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.cf_moto_products enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto products" on public.cf_moto_products;
+create policy "Authenticated users can manage cf moto products"
+  on public.cf_moto_products
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Fornecedores da CF Motos (cadastro simples, próprio do módulo de estoque)
+create table if not exists public.cf_moto_suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  contact text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists cf_moto_suppliers_name_idx on public.cf_moto_suppliers (name);
+
+drop trigger if exists set_cf_moto_suppliers_updated_at on public.cf_moto_suppliers;
+create trigger set_cf_moto_suppliers_updated_at
+  before update on public.cf_moto_suppliers
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.cf_moto_suppliers enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto suppliers" on public.cf_moto_suppliers;
+create policy "Authenticated users can manage cf moto suppliers"
+  on public.cf_moto_suppliers
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Entradas de itens (extrato de compras) da CF Motos
+create table if not exists public.cf_moto_stock_entries (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.cf_moto_products (id) on delete restrict,
+  supplier_id uuid references public.cf_moto_suppliers (id) on delete set null,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  unit_value numeric(10, 2) not null default 0 check (unit_value >= 0),
+  entry_date date not null,
+  notes text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists cf_moto_stock_entries_product_id_idx on public.cf_moto_stock_entries (product_id);
+create index if not exists cf_moto_stock_entries_entry_date_idx on public.cf_moto_stock_entries (entry_date desc);
+
+alter table public.cf_moto_stock_entries enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto stock entries" on public.cf_moto_stock_entries;
+create policy "Authenticated users can manage cf moto stock entries"
+  on public.cf_moto_stock_entries
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Itens de venda da CF Motos (o que foi vendido, ligado ao produto do estoque)
+create table if not exists public.cf_moto_sale_items (
+  id uuid primary key default gen_random_uuid(),
+  sale_id uuid not null references public.cf_moto_sales (id) on delete cascade,
+  product_id uuid not null references public.cf_moto_products (id) on delete restrict,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  unit_cost numeric(10, 2) not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists cf_moto_sale_items_sale_id_idx on public.cf_moto_sale_items (sale_id);
+create index if not exists cf_moto_sale_items_product_id_idx on public.cf_moto_sale_items (product_id);
+
+alter table public.cf_moto_sale_items enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto sale items" on public.cf_moto_sale_items;
+create policy "Authenticated users can manage cf moto sale items"
+  on public.cf_moto_sale_items
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- View de estoque consolidado (quantidade, valor total, valor médio por produto)
+-- Desconta as vendas registradas em cf_moto_sale_items (baixa por venda) usando o
+-- custo médio capturado no momento de cada venda, preservando o histórico.
+create or replace view public.cf_moto_stock_summary
+with (security_invoker = true) as
+select
+  p.id as product_id,
+  p.name as product_name,
+  p.sku as product_sku,
+  coalesce(e.qty, 0) - coalesce(s.qty, 0) as quantity,
+  coalesce(e.total_value, 0) - coalesce(s.total_cost, 0) as total_value,
+  case
+    when coalesce(e.qty, 0) - coalesce(s.qty, 0) > 0
+    then round((coalesce(e.total_value, 0) - coalesce(s.total_cost, 0)) / (coalesce(e.qty, 0) - coalesce(s.qty, 0)), 2)
+    else 0
+  end as average_value
+from public.cf_moto_products p
+left join (
+  select product_id, sum(quantity) as qty, sum(quantity * unit_value) as total_value
+  from public.cf_moto_stock_entries
+  group by product_id
+) e on e.product_id = p.id
+left join (
+  select product_id, sum(quantity) as qty, sum(quantity * unit_cost) as total_cost
+  from public.cf_moto_sale_items
+  group by product_id
+) s on s.product_id = p.id;
+
+grant select on public.cf_moto_stock_summary to authenticated;
+

@@ -29,28 +29,105 @@ function toFriendlyError(error: { code?: string; message: string }): Error {
   return new Error(error.message);
 }
 
+type SaleItemInput = { product_id: string; quantity: number };
+
+function parseCfMotoSaleItems(formData: FormData): SaleItemInput[] {
+  const raw = String(formData.get("items") ?? "");
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as { product_id?: unknown; quantity?: unknown }[];
+    return parsed
+      .map((item) => ({
+        product_id: String(item.product_id ?? ""),
+        quantity: Number(item.quantity) || 0,
+      }))
+      .filter((item) => item.product_id && item.quantity > 0);
+  } catch {
+    return [];
+  }
+}
+
+// Busca o valor médio atual de cada produto no estoque (cf_moto_stock_summary) e
+// monta os itens com o custo médio "congelado" no momento da venda.
+async function buildSaleItemsWithCost(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  items: SaleItemInput[],
+) {
+  const productIds = items.map((item) => item.product_id);
+
+  const { data: summary, error } = await supabase
+    .from("cf_moto_stock_summary")
+    .select("product_id, average_value")
+    .in("product_id", productIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const averageByProduct = new Map(
+    (summary ?? []).map((row) => [row.product_id as string, Number(row.average_value) || 0]),
+  );
+
+  return items.map((item) => ({
+    product_id: item.product_id,
+    quantity: item.quantity,
+    unit_cost: averageByProduct.get(item.product_id) ?? 0,
+  }));
+}
+
 export async function createCfMotoSale(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const sale = parseCfMotoSaleInput(formData);
+  const items = parseCfMotoSaleItems(formData);
+  if (items.length === 0) {
+    throw new Error("Selecione ao menos um produto do estoque e a quantidade");
+  }
 
-  const { error } = await supabase
+  const itemsWithCost = await buildSaleItemsWithCost(supabase, items);
+  const computedCost = itemsWithCost.reduce(
+    (acc, item) => acc + item.quantity * item.unit_cost,
+    0,
+  );
+
+  const sale = parseCfMotoSaleInput(formData);
+  sale.cost = computedCost;
+
+  const { data: inserted, error } = await supabase
     .from("cf_moto_sales")
-    .insert({ ...sale, created_by: user?.id });
+    .insert({ ...sale, created_by: user?.id })
+    .select("id")
+    .single();
 
   if (error) {
     throw toFriendlyError(error);
   }
 
+  const { error: itemsError } = await supabase
+    .from("cf_moto_sale_items")
+    .insert(itemsWithCost.map((item) => ({ ...item, sale_id: inserted.id })));
+
+  if (itemsError) {
+    throw new Error(itemsError.message);
+  }
+
   revalidatePath("/cf-motos/vendas");
+  revalidatePath("/cf-motos/estoque");
 }
 
 export async function updateCfMotoSale(id: string, formData: FormData) {
   const supabase = await createClient();
+  const items = parseCfMotoSaleItems(formData);
   const sale = parseCfMotoSaleInput(formData);
+
+  let itemsWithCost: Awaited<ReturnType<typeof buildSaleItemsWithCost>> = [];
+  if (items.length > 0) {
+    itemsWithCost = await buildSaleItemsWithCost(supabase, items);
+    sale.cost = itemsWithCost.reduce((acc, item) => acc + item.quantity * item.unit_cost, 0);
+  }
 
   const { error } = await supabase.from("cf_moto_sales").update(sale).eq("id", id);
 
@@ -58,7 +135,27 @@ export async function updateCfMotoSale(id: string, formData: FormData) {
     throw toFriendlyError(error);
   }
 
+  if (items.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("cf_moto_sale_items")
+      .delete()
+      .eq("sale_id", id);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
+
+    const { error: itemsError } = await supabase
+      .from("cf_moto_sale_items")
+      .insert(itemsWithCost.map((item) => ({ ...item, sale_id: id })));
+
+    if (itemsError) {
+      throw new Error(itemsError.message);
+    }
+  }
+
   revalidatePath("/cf-motos/vendas");
+  revalidatePath("/cf-motos/estoque");
 }
 
 export async function deleteCfMotoSale(id: string) {
@@ -70,6 +167,7 @@ export async function deleteCfMotoSale(id: string) {
   }
 
   revalidatePath("/cf-motos/vendas");
+  revalidatePath("/cf-motos/estoque");
 }
 
 // Cria uma venda CF Motos a partir de um pedido Shopee já sincronizado,

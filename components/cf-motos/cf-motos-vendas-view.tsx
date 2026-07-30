@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
 import { CfMotoSaleFormDialog } from "./cf-moto-sale-form-dialog";
-import type { CfMotoExpense, CfMotoSale } from "@/lib/types";
+import type { CfMotoExpense, CfMotoSale, CfMotoSaleItem, CfMotoStockSummary } from "@/lib/types";
 
 function profitOf(sale: CfMotoSale) {
   return sale.sale_value - sale.cost - sale.shopee_fee;
@@ -75,9 +75,13 @@ function currentMonthRange() {
 export function CfMotosVendasView({
   sales,
   expenses,
+  stockOptions,
+  saleItems,
 }: {
   sales: CfMotoSale[];
   expenses: CfMotoExpense[];
+  stockOptions: CfMotoStockSummary[];
+  saleItems: CfMotoSaleItem[];
 }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<CfMotoSale | null>(null);
@@ -117,6 +121,11 @@ export function CfMotosVendasView({
         .map((sale) => sale.product_reference)
         .filter(Boolean),
     [sales, editingSale],
+  );
+
+  const editingSaleItems = useMemo(
+    () => saleItems.filter((item) => item.sale_id === editingSale?.id),
+    [saleItems, editingSale],
   );
 
   const countedSales = useMemo(
@@ -498,6 +507,8 @@ export function CfMotosVendasView({
         onOpenChange={setOpen}
         sale={editingSale}
         existingLinks={existingLinks}
+        stockOptions={stockOptions}
+        saleItems={editingSaleItems}
       />
     </div>
   );

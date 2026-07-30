@@ -114,6 +114,71 @@ export type CfMotoExpenseInput = Omit<
   "id" | "created_by" | "created_at" | "updated_at"
 >;
 
+export type CfMotoProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CfMotoProductInput = Omit<
+  CfMotoProduct,
+  "id" | "created_by" | "created_at" | "updated_at"
+>;
+
+export type CfMotoSupplier = {
+  id: string;
+  name: string;
+  contact: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CfMotoSupplierInput = Omit<
+  CfMotoSupplier,
+  "id" | "created_by" | "created_at" | "updated_at"
+>;
+
+export type CfMotoStockEntry = {
+  id: string;
+  product_id: string;
+  supplier_id: string | null;
+  quantity: number;
+  unit_value: number;
+  entry_date: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+  product?: CfMotoProduct;
+  supplier?: CfMotoSupplier | null;
+};
+
+export type CfMotoStockEntryInput = Omit<
+  CfMotoStockEntry,
+  "id" | "created_by" | "created_at" | "product" | "supplier"
+>;
+
+export type CfMotoSaleItem = {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
+  created_at: string;
+};
+
+export type CfMotoStockSummary = {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+  total_value: number;
+  average_value: number;
+};
+
 export type ShopeeOrderRow = {
   id: string;
   shop_id: number;
