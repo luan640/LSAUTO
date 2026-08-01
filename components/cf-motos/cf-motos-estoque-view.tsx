@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import type { CfMotoStockSummary } from "@/lib/types";
 
@@ -78,7 +79,9 @@ export function CfMotosEstoqueView({ summary }: { summary: CfMotoStockSummary[] 
                     <span className="text-sm text-muted-foreground">{item.product_sku}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Qtd: {item.quantity}</span>
+                    <span className={cn(item.quantity === 0 && "font-medium text-destructive")}>
+                      Qtd: {item.quantity}
+                    </span>
                     <span>Médio: {formatCurrency(item.average_value)}</span>
                   </div>
                   <span className="text-base font-semibold">
@@ -106,7 +109,11 @@ export function CfMotosEstoqueView({ summary }: { summary: CfMotoStockSummary[] 
                   <TableRow key={item.product_id}>
                     <TableCell>{item.product_name}</TableCell>
                     <TableCell>{item.product_sku}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
+                    <TableCell
+                      className={cn(item.quantity === 0 && "font-medium text-destructive")}
+                    >
+                      {item.quantity}
+                    </TableCell>
                     <TableCell>{formatCurrency(item.total_value)}</TableCell>
                     <TableCell>{formatCurrency(item.average_value)}</TableCell>
                   </TableRow>

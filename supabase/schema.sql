@@ -400,8 +400,10 @@ create policy "Authenticated users can manage cf moto sale items"
   with check (true);
 
 -- View de estoque consolidado (quantidade, valor total, valor médio por produto)
--- Desconta as vendas registradas em cf_moto_sale_items (baixa por venda) usando o
--- custo médio capturado no momento de cada venda, preservando o histórico.
+-- "quantidade" desconta as vendas (baixa por venda). Já o "valor médio" é sempre o
+-- custo médio de compra do produto (total comprado / quantidade comprada) e não
+-- depende do saldo atual — continua mostrando o custo médio mesmo com estoque zerado,
+-- pois ele representa "quanto em média aquele item é comprado", não o valor em estoque.
 create or replace view public.cf_moto_stock_summary
 with (security_invoker = true) as
 select
@@ -409,10 +411,14 @@ select
   p.name as product_name,
   p.sku as product_sku,
   coalesce(e.qty, 0) - coalesce(s.qty, 0) as quantity,
-  coalesce(e.total_value, 0) - coalesce(s.total_cost, 0) as total_value,
   case
-    when coalesce(e.qty, 0) - coalesce(s.qty, 0) > 0
-    then round((coalesce(e.total_value, 0) - coalesce(s.total_cost, 0)) / (coalesce(e.qty, 0) - coalesce(s.qty, 0)), 2)
+    when coalesce(e.qty, 0) > 0
+    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0)) * (e.total_value / e.qty), 2)
+    else 0
+  end as total_value,
+  case
+    when coalesce(e.qty, 0) > 0
+    then round(e.total_value / e.qty, 2)
     else 0
   end as average_value
 from public.cf_moto_products p
