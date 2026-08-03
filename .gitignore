@@ -53,3 +53,6 @@ Thumbs.db
 
 # scratch / temp files
 .tmp/
+
+# playwright MCP snapshots/screenshots
+.playwright-mcp/

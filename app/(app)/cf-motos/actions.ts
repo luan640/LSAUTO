@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getConnectedShop } from "@/lib/shopee/tokens";
 import { syncOrders } from "@/lib/shopee/orders";
 import { CF_MOTO_SALE_STATUSES, type CfMotoSaleInput, type CfMotoSaleStatus } from "@/lib/types";
+import { computeLifoCosts, type LedgerEvent } from "@/lib/cf-motos/lifo-cost";
 
 function parseCfMotoSaleInput(formData: FormData): CfMotoSaleInput {
   const status = String(formData.get("status") ?? "");
@@ -29,7 +30,7 @@ function toFriendlyError(error: { code?: string; message: string }): Error {
   return new Error(error.message);
 }
 
-type SaleItemInput = { product_id: string; quantity: number };
+export type SaleItemInput = { product_id: string; quantity: number };
 
 function parseCfMotoSaleItems(formData: FormData): SaleItemInput[] {
   const raw = String(formData.get("items") ?? "");
@@ -48,32 +49,142 @@ function parseCfMotoSaleItems(formData: FormData): SaleItemInput[] {
   }
 }
 
-// Busca o valor médio atual de cada produto no estoque (cf_moto_stock_summary) e
-// monta os itens com o custo médio "congelado" no momento da venda.
+// Garante que a quantidade vendida de cada produto não passe do estoque disponível
+// agora. Ao editar uma venda, devolve ao saldo disponível a quantidade que os itens
+// atuais dessa venda já haviam consumido, já que eles serão substituídos.
+async function assertStockAvailable(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  items: SaleItemInput[],
+  excludeSaleId?: string,
+) {
+  const productIds = [...new Set(items.map((item) => item.product_id))];
+
+  const [{ data: summary, error: summaryError }, { data: excludedItems, error: excludedError }] =
+    await Promise.all([
+      supabase
+        .from("cf_moto_stock_summary")
+        .select("product_id, product_name, quantity")
+        .in("product_id", productIds),
+      excludeSaleId
+        ? supabase.from("cf_moto_sale_items").select("product_id, quantity").eq("sale_id", excludeSaleId)
+        : Promise.resolve({ data: [] as { product_id: string; quantity: number }[], error: null }),
+    ]);
+
+  if (summaryError) {
+    throw new Error(summaryError.message);
+  }
+  if (excludedError) {
+    throw new Error(excludedError.message);
+  }
+
+  const returnedByProduct = new Map<string, number>();
+  for (const row of excludedItems ?? []) {
+    returnedByProduct.set(
+      row.product_id,
+      (returnedByProduct.get(row.product_id) ?? 0) + (Number(row.quantity) || 0),
+    );
+  }
+
+  const requestedByProduct = new Map<string, number>();
+  for (const item of items) {
+    requestedByProduct.set(
+      item.product_id,
+      (requestedByProduct.get(item.product_id) ?? 0) + item.quantity,
+    );
+  }
+
+  for (const row of summary ?? []) {
+    const requested = requestedByProduct.get(row.product_id);
+    if (!requested) continue;
+
+    const available = (Number(row.quantity) || 0) + (returnedByProduct.get(row.product_id) ?? 0);
+    if (requested > available) {
+      throw new Error(
+        `Quantidade de "${row.product_name}" (${requested}) maior que o estoque disponível (${available})`,
+      );
+    }
+  }
+}
+
+// Simula o consumo de estoque em pilha (LIFO) até o momento da venda (asOfCreatedAt)
+// e monta os itens com o custo resultante "congelado" no momento da venda. Quando a
+// quantidade vendida excede o que a última compra tinha disponível, o restante é
+// puxado das compras anteriores (mais recentes primeiro).
 async function buildSaleItemsWithCost(
   supabase: Awaited<ReturnType<typeof createClient>>,
   items: SaleItemInput[],
+  options: { asOfCreatedAt?: string; excludeSaleId?: string } = {},
 ) {
-  const productIds = items.map((item) => item.product_id);
+  const asOf = options.asOfCreatedAt ?? new Date().toISOString();
+  const productIds = [...new Set(items.map((item) => item.product_id))];
 
-  const { data: summary, error } = await supabase
-    .from("cf_moto_stock_summary")
-    .select("product_id, average_value")
-    .in("product_id", productIds);
+  const [{ data: entries, error: entriesError }, { data: saleItems, error: saleItemsError }] =
+    await Promise.all([
+      supabase
+        .from("cf_moto_stock_entries")
+        .select("product_id, quantity, unit_value, created_at")
+        .in("product_id", productIds),
+      supabase
+        .from("cf_moto_sale_items")
+        .select("id, product_id, quantity, sale_id, cf_moto_sales!inner(created_at)")
+        .in("product_id", productIds),
+    ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (entriesError) {
+    throw new Error(entriesError.message);
+  }
+  if (saleItemsError) {
+    throw new Error(saleItemsError.message);
   }
 
-  const averageByProduct = new Map(
-    (summary ?? []).map((row) => [row.product_id as string, Number(row.average_value) || 0]),
-  );
+  return items.map((item, index) => {
+    const productEntries = (entries ?? []).filter(
+      (entry) => entry.product_id === item.product_id && entry.created_at <= asOf,
+    );
+    const priorSaleItems = (saleItems ?? []).filter((saleItem) => {
+      const sale = saleItem.cf_moto_sales as unknown as { created_at: string };
+      return (
+        saleItem.product_id === item.product_id &&
+        saleItem.sale_id !== options.excludeSaleId &&
+        sale.created_at < asOf
+      );
+    });
 
-  return items.map((item) => ({
-    product_id: item.product_id,
-    quantity: item.quantity,
-    unit_cost: averageByProduct.get(item.product_id) ?? 0,
-  }));
+    const newSaleItemId = `__new_${index}`;
+    const events: LedgerEvent[] = [
+      ...productEntries.map((entry) => ({
+        type: "entry" as const,
+        createdAt: entry.created_at,
+        quantity: Number(entry.quantity) || 0,
+        unitValue: Number(entry.unit_value) || 0,
+      })),
+      ...priorSaleItems.map((saleItem) => ({
+        type: "sale" as const,
+        createdAt: (saleItem.cf_moto_sales as unknown as { created_at: string }).created_at,
+        saleItemId: saleItem.id,
+        quantity: Number(saleItem.quantity) || 0,
+      })),
+      { type: "sale" as const, createdAt: asOf, saleItemId: newSaleItemId, quantity: item.quantity },
+    ];
+
+    const costs = computeLifoCosts(events);
+
+    return {
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_cost: costs.get(newSaleItemId) ?? 0,
+    };
+  });
+}
+
+// Preview (sem gravar nada) do custo LIFO de uma lista de itens, usado pelo modal
+// de venda para exibir o custo real antes de salvar.
+export async function previewCfMotoSaleItemsCost(
+  items: SaleItemInput[],
+  options: { excludeSaleId?: string; asOfCreatedAt?: string } = {},
+) {
+  const supabase = await createClient();
+  return buildSaleItemsWithCost(supabase, items, options);
 }
 
 export async function createCfMotoSale(formData: FormData) {
@@ -86,6 +197,8 @@ export async function createCfMotoSale(formData: FormData) {
   if (items.length === 0) {
     throw new Error("Selecione ao menos um produto do estoque e a quantidade");
   }
+
+  await assertStockAvailable(supabase, items);
 
   const itemsWithCost = await buildSaleItemsWithCost(supabase, items);
   const computedCost = itemsWithCost.reduce(
@@ -125,7 +238,22 @@ export async function updateCfMotoSale(id: string, formData: FormData) {
 
   let itemsWithCost: Awaited<ReturnType<typeof buildSaleItemsWithCost>> = [];
   if (items.length > 0) {
-    itemsWithCost = await buildSaleItemsWithCost(supabase, items);
+    const { data: existingSale, error: existingSaleError } = await supabase
+      .from("cf_moto_sales")
+      .select("created_at")
+      .eq("id", id)
+      .single();
+
+    if (existingSaleError) {
+      throw new Error(existingSaleError.message);
+    }
+
+    await assertStockAvailable(supabase, items, id);
+
+    itemsWithCost = await buildSaleItemsWithCost(supabase, items, {
+      asOfCreatedAt: existingSale.created_at,
+      excludeSaleId: id,
+    });
     sale.cost = itemsWithCost.reduce((acc, item) => acc + item.quantity * item.unit_cost, 0);
   }
 

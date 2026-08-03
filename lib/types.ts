@@ -177,6 +177,7 @@ export type CfMotoStockSummary = {
   quantity: number;
   total_value: number;
   average_value: number;
+  last_entry_value: number;
 };
 
 export type ShopeeOrderRow = {

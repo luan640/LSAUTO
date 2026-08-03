@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -35,6 +35,7 @@ import {
   createCfMotoSale,
   updateCfMotoSale,
   deleteCfMotoSale,
+  previewCfMotoSaleItemsCost,
 } from "@/app/(app)/cf-motos/actions";
 import { formatCurrency } from "@/lib/format";
 import type { CfMotoSale, CfMotoSaleItem, CfMotoStockSummary } from "@/lib/types";
@@ -44,7 +45,7 @@ const STATUS_LABELS: Record<CfMotoSale["status"], string> = {
   cancelado: "Cancelado",
 };
 
-type ProductOption = { value: string; label: string; average_value: number };
+type ProductOption = { value: string; label: string; quantity: number };
 
 type ItemRow = { key: string; product: ProductOption | null; quantity: string };
 
@@ -67,6 +68,31 @@ function itemRowsFromSaleItems(
     product: productOptions.find((option) => option.value === item.product_id) ?? null,
     quantity: String(item.quantity),
   }));
+}
+
+function initialItemCosts(saleItems: CfMotoSaleItem[]): Record<string, number> {
+  return Object.fromEntries(saleItems.map((item) => [item.id, Number(item.unit_cost) || 0]));
+}
+
+// Quantidade originalmente vendida por item já salvo, indexada pelo id do item
+// (mesma coisa que a "key" da linha quando ela já existe). Usado para devolver
+// ao estoque disponível a quantidade que essa venda já havia consumido, ao editar.
+function originalItemQuantities(
+  saleItems: CfMotoSaleItem[],
+): Record<string, { product_id: string; quantity: number }> {
+  return Object.fromEntries(
+    saleItems.map((item) => [item.id, { product_id: item.product_id, quantity: Number(item.quantity) }]),
+  );
+}
+
+function availableQuantity(
+  item: ItemRow,
+  original: Record<string, { product_id: string; quantity: number }>,
+): number {
+  if (!item.product) return 0;
+  const owned = original[item.key];
+  const returned = owned && owned.product_id === item.product.value ? owned.quantity : 0;
+  return item.product.quantity + returned;
 }
 
 export function CfMotoSaleFormDialog({
@@ -94,14 +120,20 @@ export function CfMotoSaleFormDialog({
       stockOptions.map((option) => ({
         value: option.product_id,
         label: `${option.product_name} · ${option.product_sku} · Estoque: ${option.quantity}`,
-        average_value: option.average_value,
+        quantity: Number(option.quantity) || 0,
       })),
     [stockOptions],
   );
 
+  const originalQuantities = useMemo(() => originalItemQuantities(saleItems), [saleItems]);
+
   const [items, setItems] = useState<ItemRow[]>(() =>
     itemRowsFromSaleItems(saleItems, productOptions),
   );
+  const [itemCosts, setItemCosts] = useState<Record<string, number>>(() =>
+    initialItemCosts(saleItems),
+  );
+  const [isCostPending, startCostTransition] = useTransition();
 
   const syncKey = open ? `open-${sale?.id ?? "new"}` : "closed";
   const [lastSyncKey, setLastSyncKey] = useState(syncKey);
@@ -109,6 +141,7 @@ export function CfMotoSaleFormDialog({
     setLastSyncKey(syncKey);
     if (open) {
       setItems(itemRowsFromSaleItems(saleItems, productOptions));
+      setItemCosts(initialItemCosts(saleItems));
     }
   }
 
@@ -124,10 +157,54 @@ export function CfMotoSaleFormDialog({
     setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
+  const itemsSignature = items
+    .map((item) => `${item.product?.value ?? ""}:${item.quantity}`)
+    .join("|");
+
+  // Busca no servidor o custo LIFO real (última entrada, "furando" pra entradas
+  // anteriores quando a quantidade excede o que a mais recente tinha disponível),
+  // pra o preview do modal bater com o que será gravado ao salvar.
+  useEffect(() => {
+    const validItems = items.filter(
+      (item) => item.product && (Number(item.quantity) || 0) > 0,
+    );
+
+    if (validItems.length === 0) {
+      setItemCosts({});
+      return;
+    }
+
+    startCostTransition(async () => {
+      try {
+        const result = await previewCfMotoSaleItemsCost(
+          validItems.map((item) => ({
+            product_id: item.product!.value,
+            quantity: Number(item.quantity),
+          })),
+          { excludeSaleId: sale?.id, asOfCreatedAt: sale?.created_at },
+        );
+
+        setItemCosts(
+          Object.fromEntries(
+            validItems.map((item, index) => [item.key, result[index]?.unit_cost ?? 0]),
+          ),
+        );
+      } catch {
+        // Preview é só exibição; o custo real é recalculado no servidor ao salvar.
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsSignature, sale?.id, sale?.created_at]);
+
   const computedCost = items.reduce((acc, item) => {
     if (!item.product) return acc;
-    return acc + (Number(item.quantity) || 0) * item.product.average_value;
+    return acc + (Number(item.quantity) || 0) * (itemCosts[item.key] ?? 0);
   }, 0);
+
+  const stockOverflowItems = items.filter(
+    (item) =>
+      item.product && (Number(item.quantity) || 0) > availableQuantity(item, originalQuantities),
+  );
 
   function handleSubmit(formData: FormData) {
     const link = String(formData.get("product_reference") ?? "").trim();
@@ -144,6 +221,15 @@ export function CfMotoSaleFormDialog({
 
       if (validItems.length === 0) {
         toast.error("Selecione ao menos um produto do estoque e a quantidade");
+        return;
+      }
+
+      if (stockOverflowItems.length > 0) {
+        toast.error(
+          `Quantidade maior que o estoque disponível: ${stockOverflowItems
+            .map((item) => item.product!.label.split(" · ")[0])
+            .join(", ")}`,
+        );
         return;
       }
 
@@ -238,7 +324,11 @@ export function CfMotoSaleFormDialog({
                 </p>
               )}
 
-              {items.map((item) => (
+              {items.map((item) => {
+                const maxQuantity = availableQuantity(item, originalQuantities);
+                const isOverStock = item.product && (Number(item.quantity) || 0) > maxQuantity;
+
+                return (
                 <Card key={item.key}>
                   <CardContent className="flex flex-col gap-3 py-4">
                     <div className="flex flex-col gap-2">
@@ -270,18 +360,38 @@ export function CfMotoSaleFormDialog({
                           type="number"
                           step="0.01"
                           min="0.01"
+                          max={item.product ? maxQuantity : undefined}
+                          aria-invalid={isOverStock || undefined}
+                          className={isOverStock ? "border-destructive" : undefined}
                           value={item.quantity}
                           onChange={(e) => updateItem(item.key, { quantity: e.target.value })}
                         />
+                        {item.product && (
+                          <p
+                            className={
+                              isOverStock
+                                ? "text-xs text-destructive"
+                                : "text-xs text-muted-foreground"
+                            }
+                          >
+                            {isOverStock
+                              ? `Estoque disponível: ${maxQuantity}`
+                              : `Disponível: ${maxQuantity}`}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2">
                         <Label>Custo do item</Label>
                         <Input
                           disabled
                           readOnly
-                          value={formatCurrency(
-                            (Number(item.quantity) || 0) * (item.product?.average_value ?? 0),
-                          )}
+                          value={
+                            isCostPending
+                              ? "Calculando..."
+                              : formatCurrency(
+                                  (Number(item.quantity) || 0) * (itemCosts[item.key] ?? 0),
+                                )
+                          }
                         />
                       </div>
                     </div>
@@ -299,7 +409,8 @@ export function CfMotoSaleFormDialog({
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -374,7 +485,7 @@ export function CfMotoSaleFormDialog({
             ) : (
               <span />
             )}
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || (isItemized && stockOverflowItems.length > 0)}>
               {isEditing ? "Salvar alterações" : "Registrar venda"}
             </Button>
           </DialogFooter>

@@ -399,11 +399,13 @@ create policy "Authenticated users can manage cf moto sale items"
   using (true)
   with check (true);
 
--- View de estoque consolidado (quantidade, valor total, valor médio por produto)
+-- View de estoque consolidado (quantidade, valor total, valor médio e última entrada por produto)
 -- "quantidade" desconta as vendas (baixa por venda). Já o "valor médio" é sempre o
 -- custo médio de compra do produto (total comprado / quantidade comprada) e não
 -- depende do saldo atual — continua mostrando o custo médio mesmo com estoque zerado,
 -- pois ele representa "quanto em média aquele item é comprado", não o valor em estoque.
+-- "last_entry_value" é o unit_value da entrada de estoque mais recente (por created_at),
+-- usado como custo da venda em vez do valor médio.
 create or replace view public.cf_moto_stock_summary
 with (security_invoker = true) as
 select
@@ -420,7 +422,8 @@ select
     when coalesce(e.qty, 0) > 0
     then round(e.total_value / e.qty, 2)
     else 0
-  end as average_value
+  end as average_value,
+  coalesce(le.unit_value, 0) as last_entry_value
 from public.cf_moto_products p
 left join (
   select product_id, sum(quantity) as qty, sum(quantity * unit_value) as total_value
@@ -431,7 +434,14 @@ left join (
   select product_id, sum(quantity) as qty, sum(quantity * unit_cost) as total_cost
   from public.cf_moto_sale_items
   group by product_id
-) s on s.product_id = p.id;
+) s on s.product_id = p.id
+left join lateral (
+  select se.unit_value
+  from public.cf_moto_stock_entries se
+  where se.product_id = p.id
+  order by se.created_at desc
+  limit 1
+) le on true;
 
 grant select on public.cf_moto_stock_summary to authenticated;
 
