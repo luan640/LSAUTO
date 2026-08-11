@@ -111,20 +111,25 @@ export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Ex
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
+  const activeSales = useMemo(
+    () => sales.filter((sale) => sale.status !== "cancelado"),
+    [sales],
+  );
+
   const filtered = useMemo(() => {
     if (period === "hoje") {
       const todayStr = format(new Date(), "yyyy-MM-dd");
-      return sales.filter((sale) => sale.sale_date === todayStr);
+      return activeSales.filter((sale) => sale.sale_date === todayStr);
     }
 
     if (period === "ontem") {
       const yesterdayStr = format(subDays(new Date(), 1), "yyyy-MM-dd");
-      return sales.filter((sale) => sale.sale_date === yesterdayStr);
+      return activeSales.filter((sale) => sale.sale_date === yesterdayStr);
     }
 
     if (period === "personalizado") {
-      if (!customStart && !customEnd) return sales;
-      return sales.filter((sale) => {
+      if (!customStart && !customEnd) return activeSales;
+      return activeSales.filter((sale) => {
         if (customStart && sale.sale_date < customStart) return false;
         if (customEnd && sale.sale_date > customEnd) return false;
         return true;
@@ -132,12 +137,12 @@ export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Ex
     }
 
     const start = periodStart(period);
-    if (!start) return sales;
-    return sales.filter((sale) => {
+    if (!start) return activeSales;
+    return activeSales.filter((sale) => {
       const date = parseISO(sale.sale_date);
       return isAfter(date, start) || isEqual(date, start);
     });
-  }, [sales, period, customStart, customEnd]);
+  }, [activeSales, period, customStart, customEnd]);
 
   const filteredExpenses = useMemo(() => {
     const { start, end } = periodRange(period, customStart, customEnd);

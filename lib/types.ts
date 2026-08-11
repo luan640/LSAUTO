@@ -4,6 +4,10 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export type DeliveryType = "retirada" | "frete";
 
+export const SALE_STATUSES = ["finalizado", "cancelado"] as const;
+
+export type SaleStatus = (typeof SALE_STATUSES)[number];
+
 export type Sale = {
   id: string;
   sale_date: string;
@@ -12,12 +16,16 @@ export type Sale = {
   delivery_type: DeliveryType;
   cost: number;
   products: string;
+  status: SaleStatus;
   created_by: string;
   created_at: string;
   updated_at: string;
 };
 
-export type SaleInput = Omit<Sale, "id" | "created_by" | "created_at" | "updated_at">;
+export type SaleInput = Omit<
+  Sale,
+  "id" | "status" | "created_by" | "created_at" | "updated_at"
+>;
 
 export type SupplierAccess = {
   id: string;
@@ -171,6 +179,58 @@ export type CfMotoSaleItem = {
 };
 
 export type CfMotoStockSummary = {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+  total_value: number;
+  average_value: number;
+  last_entry_value: number;
+};
+
+export type LsProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LsProductInput = Omit<
+  LsProduct,
+  "id" | "created_by" | "created_at" | "updated_at"
+>;
+
+export type LsStockEntry = {
+  id: string;
+  product_id: string;
+  supplier_id: string | null;
+  quantity: number;
+  unit_value: number;
+  entry_date: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+  product?: LsProduct;
+  supplier?: SupplierAccess | null;
+};
+
+export type LsStockEntryInput = Omit<
+  LsStockEntry,
+  "id" | "created_by" | "created_at" | "product" | "supplier"
+>;
+
+export type LsSaleItem = {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
+  created_at: string;
+};
+
+export type LsStockSummary = {
   product_id: string;
   product_name: string;
   product_sku: string;

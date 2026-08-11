@@ -34,7 +34,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate, formatPercent, profitMargin, salesMargin } from "@/lib/format";
 import { SaleFormDialog } from "./sale-form-dialog";
-import { PAYMENT_METHODS, type Sale } from "@/lib/types";
+import { PAYMENT_METHODS, type LsSaleItem, type LsStockSummary, type Sale } from "@/lib/types";
 
 const ALL_PAYMENT_METHODS = "todos";
 
@@ -47,7 +47,23 @@ function currentMonthRange() {
   return { from: toIso(from), to: toIso(to) };
 }
 
-export function SalesView({ sales }: { sales: Sale[] }) {
+function StatusBadge({ status }: { status: Sale["status"] }) {
+  return (
+    <Badge variant={status === "cancelado" ? "destructive" : "default"}>
+      {status === "cancelado" ? "Cancelado" : "Finalizado"}
+    </Badge>
+  );
+}
+
+export function SalesView({
+  sales,
+  stockOptions,
+  saleItems,
+}: {
+  sales: Sale[];
+  stockOptions: LsStockSummary[];
+  saleItems: LsSaleItem[];
+}) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const defaultRange = useMemo(() => currentMonthRange(), []);
@@ -67,6 +83,11 @@ export function SalesView({ sales }: { sales: Sale[] }) {
     setOpen(true);
   }
 
+  const editingSaleItems = useMemo(
+    () => saleItems.filter((item) => item.sale_id === editingSale?.id),
+    [saleItems, editingSale],
+  );
+
   const filteredSales = useMemo(() => {
     const productQuery = product.trim().toLowerCase();
 
@@ -83,27 +104,32 @@ export function SalesView({ sales }: { sales: Sale[] }) {
     });
   }, [sales, dateFrom, dateTo, paymentMethod, product]);
 
-  const totalProfit = filteredSales.reduce(
+  const countedSales = useMemo(
+    () => filteredSales.filter((sale) => sale.status !== "cancelado"),
+    [filteredSales],
+  );
+
+  const totalProfit = countedSales.reduce(
     (acc, sale) => acc + (sale.sale_value - sale.cost),
     0,
   );
 
-  const totalValue = filteredSales.reduce((acc, sale) => acc + sale.sale_value, 0);
+  const totalValue = countedSales.reduce((acc, sale) => acc + sale.sale_value, 0);
 
-  const totalCost = filteredSales.reduce((acc, sale) => acc + sale.cost, 0);
+  const totalCost = countedSales.reduce((acc, sale) => acc + sale.cost, 0);
 
-  const avgProfitMargin = filteredSales.length
-    ? filteredSales.reduce(
+  const avgProfitMargin = countedSales.length
+    ? countedSales.reduce(
         (acc, sale) => acc + profitMargin(sale.sale_value, sale.cost),
         0,
-      ) / filteredSales.length
+      ) / countedSales.length
     : 0;
 
-  const avgSalesMargin = filteredSales.length
-    ? filteredSales.reduce(
+  const avgSalesMargin = countedSales.length
+    ? countedSales.reduce(
         (acc, sale) => acc + salesMargin(sale.sale_value, sale.cost),
         0,
-      ) / filteredSales.length
+      ) / countedSales.length
     : 0;
 
   const activeFiltersCount = [
@@ -311,6 +337,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                     <Badge variant="outline">
                       {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
                     </Badge>
+                    <StatusBadge status={sale.status} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center justify-between gap-1">
@@ -354,6 +381,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                   <TableHead className="text-base text-muted-foreground">% Markup</TableHead>
                   <TableHead className="text-base text-muted-foreground">% Margem</TableHead>
                   <TableHead className="text-base text-muted-foreground">Produtos</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -382,6 +410,9 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                     <TableCell className="max-w-[240px] truncate">
                       {sale.products}
                     </TableCell>
+                    <TableCell>
+                      <StatusBadge status={sale.status} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -395,6 +426,7 @@ export function SalesView({ sales }: { sales: Sale[] }) {
                   <TableCell>{formatPercent(avgProfitMargin)}</TableCell>
                   <TableCell>{formatPercent(avgSalesMargin)}</TableCell>
                   <TableCell />
+                  <TableCell />
                 </TableRow>
               </TableFooter>
             </Table>
@@ -402,7 +434,13 @@ export function SalesView({ sales }: { sales: Sale[] }) {
         </>
       )}
 
-      <SaleFormDialog open={open} onOpenChange={setOpen} sale={editingSale} />
+      <SaleFormDialog
+        open={open}
+        onOpenChange={setOpen}
+        sale={editingSale}
+        stockOptions={stockOptions}
+        saleItems={editingSaleItems}
+      />
     </div>
   );
 }

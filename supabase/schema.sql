@@ -7,10 +7,19 @@ create table if not exists public.sales (
   delivery_type text not null check (delivery_type in ('retirada', 'frete')),
   cost numeric(10, 2) not null default 0,
   products text not null default '',
+  status text not null default 'finalizado' check (status in ('finalizado', 'cancelado')),
   created_by uuid references auth.users (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.sales
+  add column if not exists status text not null default 'finalizado';
+
+alter table public.sales
+  drop constraint if exists sales_status_check;
+alter table public.sales
+  add constraint sales_status_check check (status in ('finalizado', 'cancelado'));
 
 create index if not exists sales_sale_date_idx on public.sales (sale_date desc);
 
@@ -444,4 +453,126 @@ left join lateral (
 ) le on true;
 
 grant select on public.cf_moto_stock_summary to authenticated;
+
+-- =========================================================================
+-- Auto Peças LS: controle de estoque (produtos, entradas, itens de venda)
+-- =========================================================================
+
+-- Produtos cadastrados da Auto Peças LS
+create table if not exists public.ls_products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  sku text not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists set_ls_products_updated_at on public.ls_products;
+create trigger set_ls_products_updated_at
+  before update on public.ls_products
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.ls_products enable row level security;
+
+drop policy if exists "Authenticated users can manage ls products" on public.ls_products;
+create policy "Authenticated users can manage ls products"
+  on public.ls_products
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Entradas de itens (extrato de compras) da Auto Peças LS. O fornecedor reaproveita
+-- o cadastro de Fornecedores já existente (supplier_accesses).
+create table if not exists public.ls_stock_entries (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.ls_products (id) on delete restrict,
+  supplier_id uuid references public.supplier_accesses (id) on delete set null,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  unit_value numeric(10, 2) not null default 0 check (unit_value >= 0),
+  entry_date date not null,
+  notes text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ls_stock_entries_product_id_idx on public.ls_stock_entries (product_id);
+create index if not exists ls_stock_entries_entry_date_idx on public.ls_stock_entries (entry_date desc);
+
+alter table public.ls_stock_entries enable row level security;
+
+drop policy if exists "Authenticated users can manage ls stock entries" on public.ls_stock_entries;
+create policy "Authenticated users can manage ls stock entries"
+  on public.ls_stock_entries
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Itens de venda da Auto Peças LS (o que foi vendido, ligado ao produto do estoque).
+-- Só existe para vendas registradas a partir da itemização por estoque; vendas
+-- antigas continuam sem linhas aqui e usam o campo de texto livre "products".
+create table if not exists public.ls_sale_items (
+  id uuid primary key default gen_random_uuid(),
+  sale_id uuid not null references public.sales (id) on delete cascade,
+  product_id uuid not null references public.ls_products (id) on delete restrict,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  unit_cost numeric(10, 2) not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ls_sale_items_sale_id_idx on public.ls_sale_items (sale_id);
+create index if not exists ls_sale_items_product_id_idx on public.ls_sale_items (product_id);
+
+alter table public.ls_sale_items enable row level security;
+
+drop policy if exists "Authenticated users can manage ls sale items" on public.ls_sale_items;
+create policy "Authenticated users can manage ls sale items"
+  on public.ls_sale_items
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- View de estoque consolidado (mesma lógica da cf_moto_stock_summary)
+create or replace view public.ls_stock_summary
+with (security_invoker = true) as
+select
+  p.id as product_id,
+  p.name as product_name,
+  p.sku as product_sku,
+  coalesce(e.qty, 0) - coalesce(s.qty, 0) as quantity,
+  case
+    when coalesce(e.qty, 0) > 0
+    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0)) * (e.total_value / e.qty), 2)
+    else 0
+  end as total_value,
+  case
+    when coalesce(e.qty, 0) > 0
+    then round(e.total_value / e.qty, 2)
+    else 0
+  end as average_value,
+  coalesce(le.unit_value, 0) as last_entry_value
+from public.ls_products p
+left join (
+  select product_id, sum(quantity) as qty, sum(quantity * unit_value) as total_value
+  from public.ls_stock_entries
+  group by product_id
+) e on e.product_id = p.id
+left join (
+  select product_id, sum(quantity) as qty, sum(quantity * unit_cost) as total_cost
+  from public.ls_sale_items
+  group by product_id
+) s on s.product_id = p.id
+left join lateral (
+  select se.unit_value
+  from public.ls_stock_entries se
+  where se.product_id = p.id
+  order by se.created_at desc
+  limit 1
+) le on true;
+
+grant select on public.ls_stock_summary to authenticated;
 

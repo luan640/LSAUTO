@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getConnectedShop } from "@/lib/shopee/tokens";
 import { syncOrders } from "@/lib/shopee/orders";
 import { CF_MOTO_SALE_STATUSES, type CfMotoSaleInput, type CfMotoSaleStatus } from "@/lib/types";
-import { computeLifoCosts, type LedgerEvent } from "@/lib/cf-motos/lifo-cost";
+import { computeLifoCosts, type LedgerEvent } from "@/lib/stock/lifo-cost";
 
 function parseCfMotoSaleInput(formData: FormData): CfMotoSaleInput {
   const status = String(formData.get("status") ?? "");

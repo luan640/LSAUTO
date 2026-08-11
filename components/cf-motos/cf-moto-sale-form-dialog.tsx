@@ -170,7 +170,9 @@ export function CfMotoSaleFormDialog({
     );
 
     if (validItems.length === 0) {
-      setItemCosts({});
+      startCostTransition(() => {
+        setItemCosts({});
+      });
       return;
     }
 

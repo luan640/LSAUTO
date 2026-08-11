@@ -1,6 +1,7 @@
 // Simula o consumo de estoque em pilha (LIFO): cada venda consome primeiro da
 // entrada de compra mais recente disponível e só "fura" para entradas mais
 // antigas quando a mais recente não tem quantidade suficiente.
+// Compartilhado entre os módulos que controlam estoque (CF Motos, Auto Peças LS).
 
 export type LedgerEntryEvent = {
   type: "entry";

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  KeyRound,
   LogOut,
   Plus,
   Bike,
@@ -16,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(app)/actions";
 import { SaleFormDialog } from "@/components/sales/sale-form-dialog";
+import type { LsStockSummary } from "@/lib/types";
 import {
   Sheet,
   SheetClose,
@@ -42,6 +42,9 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/orcamentos", label: "Orçamentos" },
       { href: "/despesas", label: "Despesas" },
       { href: "/dashboard", label: "Painel" },
+      { href: "/produtos", label: "Produtos" },
+      { href: "/entradas", label: "Entrada de Itens" },
+      { href: "/fornecedores", label: "Fornecedores" },
     ],
   },
   {
@@ -57,7 +60,6 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/cf-motos/entradas", label: "Entrada de Itens" },
     ],
   },
-  { href: "/fornecedores", label: "Fornecedores", icon: KeyRound },
   { href: "/integracoes", label: "Integrações", icon: Plug },
 ];
 
@@ -130,9 +132,11 @@ function MobileNavItem({ item, pathname }: { item: NavItem; pathname: string }) 
 
 export function AppShell({
   email,
+  stockOptions,
   children,
 }: {
   email: string;
+  stockOptions: LsStockSummary[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -272,7 +276,12 @@ export function AppShell({
         </button>
       </nav>
 
-      <SaleFormDialog open={newSaleOpen} onOpenChange={setNewSaleOpen} sale={null} />
+      <SaleFormDialog
+        open={newSaleOpen}
+        onOpenChange={setNewSaleOpen}
+        sale={null}
+        stockOptions={stockOptions}
+      />
     </div>
   );
 }
