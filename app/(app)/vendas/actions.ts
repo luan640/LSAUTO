@@ -313,21 +313,17 @@ export async function updateSale(id: string, formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function deleteSale(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("sales").delete().eq("id", id);
-
-  if (error) {
-    throw new Error(error.message);
+// Cancela uma venda: marca o status como cancelado e grava o motivo informado.
+// Quando a venda tem itens de estoque vinculados (modelo novo, itemizado), cada
+// item volta ao estoque através de uma nova entrada (para manter rastreável de
+// onde veio). Vendas antigas (texto livre, sem itens) só ficam marcadas como
+// canceladas, já que não há item de estoque associado para devolver.
+export async function cancelSale(id: string, reason: string) {
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) {
+    throw new Error("Informe o motivo do cancelamento");
   }
 
-  revalidatePath("/vendas");
-  revalidatePath("/dashboard");
-}
-
-// Cancela uma venda itemizada: marca o status como cancelado e devolve cada item
-// ao estoque criando uma nova entrada (para manter rastreável de onde veio).
-export async function cancelSale(id: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -354,37 +350,37 @@ export async function cancelSale(id: string) {
   if (itemsError) {
     throw new Error(itemsError.message);
   }
-  if (!items || items.length === 0) {
-    throw new Error("Esta venda não tem itens de estoque vinculados para devolver");
-  }
 
   const { error: statusError } = await supabase
     .from("sales")
-    .update({ status: "cancelado" })
+    .update({ status: "cancelado", cancel_reason: trimmedReason })
     .eq("id", id);
 
   if (statusError) {
     throw new Error(statusError.message);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const { error: returnError } = await supabase.from("ls_stock_entries").insert(
-    items.map((item) => ({
-      product_id: item.product_id,
-      supplier_id: null,
-      quantity: item.quantity,
-      unit_value: item.unit_cost,
-      entry_date: today,
-      notes: "Devolução por cancelamento de venda",
-      created_by: user?.id,
-    })),
-  );
+  if (items && items.length > 0) {
+    const today = new Date().toISOString().slice(0, 10);
+    const { error: returnError } = await supabase.from("ls_stock_entries").insert(
+      items.map((item) => ({
+        product_id: item.product_id,
+        supplier_id: null,
+        quantity: item.quantity,
+        unit_value: item.unit_cost,
+        entry_date: today,
+        notes: `Devolução por cancelamento de venda: ${trimmedReason}`,
+        created_by: user?.id,
+      })),
+    );
 
-  if (returnError) {
-    throw new Error(returnError.message);
+    if (returnError) {
+      throw new Error(returnError.message);
+    }
+
+    revalidatePath("/entradas");
   }
 
   revalidatePath("/vendas");
-  revalidatePath("/entradas");
   revalidatePath("/dashboard");
 }

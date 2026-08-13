@@ -27,6 +27,7 @@ export type Sale = {
   cost: number;
   products: string;
   status: SaleStatus;
+  cancel_reason: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -34,7 +35,7 @@ export type Sale = {
 
 export type SaleInput = Omit<
   Sale,
-  "id" | "status" | "created_by" | "created_at" | "updated_at"
+  "id" | "status" | "cancel_reason" | "created_by" | "created_at" | "updated_at"
 >;
 
 export type SupplierAccess = {

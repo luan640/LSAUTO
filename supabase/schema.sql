@@ -8,6 +8,7 @@ create table if not exists public.sales (
   cost numeric(10, 2) not null default 0,
   products text not null default '',
   status text not null default 'finalizado' check (status in ('finalizado', 'cancelado')),
+  cancel_reason text not null default '',
   created_by uuid references auth.users (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -20,6 +21,9 @@ alter table public.sales
   drop constraint if exists sales_status_check;
 alter table public.sales
   add constraint sales_status_check check (status in ('finalizado', 'cancelado'));
+
+alter table public.sales
+  add column if not exists cancel_reason text not null default '';
 
 create index if not exists sales_sale_date_idx on public.sales (sale_date desc);
 

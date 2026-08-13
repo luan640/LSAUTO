@@ -36,7 +36,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   createSale,
   updateSale,
-  deleteSale,
   cancelSale,
   previewSaleItemsCost,
 } from "@/app/(app)/vendas/actions";
@@ -111,6 +110,8 @@ export function SaleFormDialog({
   );
   const [isPending, startTransition] = useTransition();
   const [isCancelling, startCancelTransition] = useTransition();
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const isEditing = !!sale;
   const isItemized = !sale || saleItems.length > 0;
@@ -261,29 +262,21 @@ export function SaleFormDialog({
     });
   }
 
-  function handleDelete() {
+  function handleConfirmCancelSale() {
     if (!sale) return;
-    if (!confirm("Excluir esta venda?")) return;
 
-    startTransition(async () => {
-      try {
-        await deleteSale(sale.id);
-        toast.success("Venda excluída");
-        onOpenChange(false);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Erro ao excluir venda");
-      }
-    });
-  }
-
-  function handleCancelSale() {
-    if (!sale) return;
-    if (!confirm("Cancelar esta venda? O item vendido volta para o estoque.")) return;
+    if (!cancelReason.trim()) {
+      toast.error("Informe o motivo do cancelamento");
+      return;
+    }
 
     startCancelTransition(async () => {
       try {
-        await cancelSale(sale.id);
-        toast.success("Venda cancelada e item devolvido ao estoque");
+        await cancelSale(sale.id, cancelReason);
+        toast.success(
+          isItemized ? "Venda cancelada e item devolvido ao estoque" : "Venda cancelada",
+        );
+        setCancelDialogOpen(false);
         onOpenChange(false);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Erro ao cancelar venda");
@@ -308,6 +301,13 @@ export function SaleFormDialog({
               : "O frete não é cobrado do cliente."}
           </DialogDescription>
         </DialogHeader>
+
+        {isCancelled && sale.cancel_reason && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <span className="font-medium">Motivo do cancelamento: </span>
+            {sale.cancel_reason}
+          </div>
+        )}
 
         <form action={handleSubmit} className="flex flex-col gap-4">
           <fieldset disabled={isCancelled} className="flex flex-col gap-4">
@@ -506,27 +506,18 @@ export function SaleFormDialog({
           </fieldset>
 
           <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-            {isEditing ? (
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={isPending || isCancelling}
-                >
-                  Excluir
-                </Button>
-                {isItemized && !isCancelled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancelSale}
-                    disabled={isPending || isCancelling}
-                  >
-                    Cancelar venda
-                  </Button>
-                )}
-              </div>
+            {isEditing && !isCancelled ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  setCancelReason("");
+                  setCancelDialogOpen(true);
+                }}
+                disabled={isPending || isCancelling}
+              >
+                Cancelar venda
+              </Button>
             ) : (
               <span />
             )}
@@ -541,6 +532,49 @@ export function SaleFormDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar venda</DialogTitle>
+            <DialogDescription>
+              {isItemized
+                ? "O item vendido volta para o estoque. Informe o motivo do cancelamento."
+                : "Informe o motivo do cancelamento."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="cancel_reason">Motivo do cancelamento</Label>
+            <Textarea
+              id="cancel_reason"
+              rows={3}
+              placeholder="Ex: cliente desistiu da compra, item com defeito..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={isCancelling}
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmCancelSale}
+              disabled={isCancelling || !cancelReason.trim()}
+            >
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
