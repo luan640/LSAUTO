@@ -104,23 +104,33 @@ async function buildSaleItemsWithCost(
   const asOf = options.asOfCreatedAt ?? new Date().toISOString();
   const productIds = [...new Set(items.map((item) => item.product_id))];
 
-  const [{ data: entries, error: entriesError }, { data: saleItems, error: saleItemsError }] =
-    await Promise.all([
-      supabase
-        .from("ls_stock_entries")
-        .select("product_id, quantity, unit_value, created_at")
-        .in("product_id", productIds),
-      supabase
-        .from("ls_sale_items")
-        .select("id, product_id, quantity, sale_id, sales!inner(created_at)")
-        .in("product_id", productIds),
-    ]);
+  const [
+    { data: entries, error: entriesError },
+    { data: saleItems, error: saleItemsError },
+    { data: exits, error: exitsError },
+  ] = await Promise.all([
+    supabase
+      .from("ls_stock_entries")
+      .select("product_id, quantity, unit_value, created_at")
+      .in("product_id", productIds),
+    supabase
+      .from("ls_sale_items")
+      .select("id, product_id, quantity, sale_id, sales!inner(created_at)")
+      .in("product_id", productIds),
+    supabase
+      .from("ls_stock_exits")
+      .select("id, product_id, quantity, created_at")
+      .in("product_id", productIds),
+  ]);
 
   if (entriesError) {
     throw new Error(entriesError.message);
   }
   if (saleItemsError) {
     throw new Error(saleItemsError.message);
+  }
+  if (exitsError) {
+    throw new Error(exitsError.message);
   }
 
   return items.map((item, index) => {
@@ -135,6 +145,9 @@ async function buildSaleItemsWithCost(
         sale.created_at < asOf
       );
     });
+    const priorExits = (exits ?? []).filter(
+      (exit) => exit.product_id === item.product_id && exit.created_at < asOf,
+    );
 
     const newSaleItemId = `__new_${index}`;
     const events: LedgerEvent[] = [
@@ -149,6 +162,12 @@ async function buildSaleItemsWithCost(
         createdAt: (saleItem.sales as unknown as { created_at: string }).created_at,
         saleItemId: saleItem.id,
         quantity: Number(saleItem.quantity) || 0,
+      })),
+      ...priorExits.map((exit) => ({
+        type: "sale" as const,
+        createdAt: exit.created_at,
+        saleItemId: `__exit_${exit.id}`,
+        quantity: Number(exit.quantity) || 0,
       })),
       { type: "sale" as const, createdAt: asOf, saleItemId: newSaleItemId, quantity: item.quantity },
     ];

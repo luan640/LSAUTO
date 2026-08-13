@@ -8,6 +8,16 @@ export const SALE_STATUSES = ["finalizado", "cancelado"] as const;
 
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
+export const STOCK_EXIT_REASONS = ["ajuste_estoque", "devolucao_fornecedor", "outro"] as const;
+
+export type StockExitReason = (typeof STOCK_EXIT_REASONS)[number];
+
+export const STOCK_EXIT_REASON_LABELS: Record<StockExitReason, string> = {
+  ajuste_estoque: "Ajuste de estoque",
+  devolucao_fornecedor: "Devolução ao fornecedor",
+  outro: "Outro",
+};
+
 export type Sale = {
   id: string;
   sale_date: string;
@@ -169,6 +179,23 @@ export type CfMotoStockEntryInput = Omit<
   "id" | "created_by" | "created_at" | "product" | "supplier"
 >;
 
+export type CfMotoStockExit = {
+  id: string;
+  product_id: string;
+  quantity: number;
+  reason: StockExitReason;
+  exit_date: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+  product?: CfMotoProduct;
+};
+
+export type CfMotoStockExitInput = Omit<
+  CfMotoStockExit,
+  "id" | "created_by" | "created_at" | "product"
+>;
+
 export type CfMotoSaleItem = {
   id: string;
   sale_id: string;
@@ -219,6 +246,23 @@ export type LsStockEntry = {
 export type LsStockEntryInput = Omit<
   LsStockEntry,
   "id" | "created_by" | "created_at" | "product" | "supplier"
+>;
+
+export type LsStockExit = {
+  id: string;
+  product_id: string;
+  quantity: number;
+  reason: StockExitReason;
+  exit_date: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+  product?: LsProduct;
+};
+
+export type LsStockExitInput = Omit<
+  LsStockExit,
+  "id" | "created_by" | "created_at" | "product"
 >;
 
 export type LsSaleItem = {

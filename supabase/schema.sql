@@ -408,8 +408,34 @@ create policy "Authenticated users can manage cf moto sale items"
   using (true)
   with check (true);
 
+-- Saídas manuais de estoque da CF Motos (ajuste de estoque, devolução ao
+-- fornecedor, etc.) — não são vendas, mas também baixam a quantidade disponível.
+create table if not exists public.cf_moto_stock_exits (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.cf_moto_products (id) on delete restrict,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  reason text not null check (reason in ('ajuste_estoque', 'devolucao_fornecedor', 'outro')),
+  exit_date date not null,
+  notes text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists cf_moto_stock_exits_product_id_idx on public.cf_moto_stock_exits (product_id);
+create index if not exists cf_moto_stock_exits_exit_date_idx on public.cf_moto_stock_exits (exit_date desc);
+
+alter table public.cf_moto_stock_exits enable row level security;
+
+drop policy if exists "Authenticated users can manage cf moto stock exits" on public.cf_moto_stock_exits;
+create policy "Authenticated users can manage cf moto stock exits"
+  on public.cf_moto_stock_exits
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- View de estoque consolidado (quantidade, valor total, valor médio e última entrada por produto)
--- "quantidade" desconta as vendas (baixa por venda). Já o "valor médio" é sempre o
+-- "quantidade" desconta as vendas e as saídas manuais. Já o "valor médio" é sempre o
 -- custo médio de compra do produto (total comprado / quantidade comprada) e não
 -- depende do saldo atual — continua mostrando o custo médio mesmo com estoque zerado,
 -- pois ele representa "quanto em média aquele item é comprado", não o valor em estoque.
@@ -421,10 +447,10 @@ select
   p.id as product_id,
   p.name as product_name,
   p.sku as product_sku,
-  coalesce(e.qty, 0) - coalesce(s.qty, 0) as quantity,
+  coalesce(e.qty, 0) - coalesce(s.qty, 0) - coalesce(x.qty, 0) as quantity,
   case
     when coalesce(e.qty, 0) > 0
-    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0)) * (e.total_value / e.qty), 2)
+    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0) - coalesce(x.qty, 0)) * (e.total_value / e.qty), 2)
     else 0
   end as total_value,
   case
@@ -444,6 +470,11 @@ left join (
   from public.cf_moto_sale_items
   group by product_id
 ) s on s.product_id = p.id
+left join (
+  select product_id, sum(quantity) as qty
+  from public.cf_moto_stock_exits
+  group by product_id
+) x on x.product_id = p.id
 left join lateral (
   select se.unit_value
   from public.cf_moto_stock_entries se
@@ -536,6 +567,32 @@ create policy "Authenticated users can manage ls sale items"
   using (true)
   with check (true);
 
+-- Saídas manuais de estoque da Auto Peças LS (ajuste de estoque, devolução ao
+-- fornecedor, etc.) — não são vendas, mas também baixam a quantidade disponível.
+create table if not exists public.ls_stock_exits (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.ls_products (id) on delete restrict,
+  quantity numeric(10, 2) not null check (quantity > 0),
+  reason text not null check (reason in ('ajuste_estoque', 'devolucao_fornecedor', 'outro')),
+  exit_date date not null,
+  notes text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ls_stock_exits_product_id_idx on public.ls_stock_exits (product_id);
+create index if not exists ls_stock_exits_exit_date_idx on public.ls_stock_exits (exit_date desc);
+
+alter table public.ls_stock_exits enable row level security;
+
+drop policy if exists "Authenticated users can manage ls stock exits" on public.ls_stock_exits;
+create policy "Authenticated users can manage ls stock exits"
+  on public.ls_stock_exits
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- View de estoque consolidado (mesma lógica da cf_moto_stock_summary)
 create or replace view public.ls_stock_summary
 with (security_invoker = true) as
@@ -543,10 +600,10 @@ select
   p.id as product_id,
   p.name as product_name,
   p.sku as product_sku,
-  coalesce(e.qty, 0) - coalesce(s.qty, 0) as quantity,
+  coalesce(e.qty, 0) - coalesce(s.qty, 0) - coalesce(x.qty, 0) as quantity,
   case
     when coalesce(e.qty, 0) > 0
-    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0)) * (e.total_value / e.qty), 2)
+    then round((coalesce(e.qty, 0) - coalesce(s.qty, 0) - coalesce(x.qty, 0)) * (e.total_value / e.qty), 2)
     else 0
   end as total_value,
   case
@@ -566,6 +623,11 @@ left join (
   from public.ls_sale_items
   group by product_id
 ) s on s.product_id = p.id
+left join (
+  select product_id, sum(quantity) as qty
+  from public.ls_stock_exits
+  group by product_id
+) x on x.product_id = p.id
 left join lateral (
   select se.unit_value
   from public.ls_stock_entries se
