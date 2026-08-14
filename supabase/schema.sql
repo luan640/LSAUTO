@@ -642,3 +642,29 @@ left join lateral (
 
 grant select on public.ls_stock_summary to authenticated;
 
+-- Ajustes manuais de saldo da Auto Peças LS (ex.: bater o saldo do sistema com o
+-- valor físico em caixa). "amount" pode ser positivo (aumenta o saldo) ou
+-- negativo (reduz o saldo).
+create table if not exists public.ls_balance_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  description text not null,
+  amount numeric(10, 2) not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ls_balance_adjustments_created_at_idx
+  on public.ls_balance_adjustments (created_at desc);
+
+alter table public.ls_balance_adjustments enable row level security;
+
+drop policy if exists "Authenticated users can manage ls balance adjustments" on public.ls_balance_adjustments;
+create policy "Authenticated users can manage ls balance adjustments"
+  on public.ls_balance_adjustments
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+grant select, insert, update, delete on public.ls_balance_adjustments to authenticated;
+

@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { formatCurrency } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Expense, Sale } from "@/lib/types";
 
 const PERIODS = {
@@ -106,7 +107,17 @@ function periodRange(
   return { start: start ? format(start, "yyyy-MM-dd") : null, end: todayStr };
 }
 
-export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Expense[] }) {
+export function DashboardView({
+  sales,
+  expenses,
+  totalStockValue,
+  totalBalanceAdjustments,
+}: {
+  sales: Sale[];
+  expenses: Expense[];
+  totalStockValue: number;
+  totalBalanceAdjustments: number;
+}) {
   const [period, setPeriod] = useState<PeriodKey>("mes_atual");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -161,13 +172,17 @@ export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Ex
   const summary = useMemo(() => {
     const totalSales = filtered.reduce((acc, s) => acc + s.sale_value, 0);
     const totalCost = filtered.reduce((acc, s) => acc + s.cost, 0);
+    const count = filtered.length;
     return {
       totalSales,
       totalCost,
       profit: totalSales - totalCost - totalExpenses,
-      count: filtered.length,
+      count,
+      averageTicket: count > 0 ? totalSales / count : 0,
     };
   }, [filtered, totalExpenses]);
+
+  const balance = summary.profit - totalStockValue + totalBalanceAdjustments;
 
   const monthly = useMemo(() => {
     const map = new Map<string, { revenue: number; profit: number }>();
@@ -280,7 +295,7 @@ export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Ex
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -334,6 +349,52 @@ export function DashboardView({ sales, expenses }: { sales: Sale[]; expenses: Ex
           </CardHeader>
           <CardContent className="text-xl font-semibold md:text-2xl">
             {summary.count}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Ticket médio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span className="text-xl font-semibold md:text-2xl">
+              {formatCurrency(summary.averageTicket)}
+            </span>
+            <span className="text-xs text-muted-foreground">Faturamento ÷ Vendas</span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total em estoque
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span className="text-xl font-semibold md:text-2xl">
+              {formatCurrency(totalStockValue)}
+            </span>
+            <span className="text-xs text-muted-foreground">Não depende do período</span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Saldo em carteira
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span
+              className={cn(
+                "text-xl font-semibold md:text-2xl",
+                balance < 0 && "text-destructive",
+              )}
+            >
+              {formatCurrency(balance)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Lucro - Total em estoque + Ajustes
+            </span>
           </CardContent>
         </Card>
       </div>

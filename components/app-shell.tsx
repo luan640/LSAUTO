@@ -43,8 +43,10 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/despesas", label: "Despesas" },
       { href: "/dashboard", label: "Painel" },
       { href: "/produtos", label: "Produtos" },
+      { href: "/estoque", label: "Estoque" },
       { href: "/entradas", label: "Entrada de Itens" },
       { href: "/fornecedores", label: "Fornecedores" },
+      { href: "/ajuste-monetario", label: "Ajuste Monetário" },
     ],
   },
   {

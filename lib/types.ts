@@ -285,6 +285,19 @@ export type LsStockSummary = {
   last_entry_value: number;
 };
 
+export type LsBalanceAdjustment = {
+  id: string;
+  description: string;
+  amount: number;
+  created_by: string;
+  created_at: string;
+};
+
+export type LsBalanceAdjustmentInput = Omit<
+  LsBalanceAdjustment,
+  "id" | "created_by" | "created_at"
+>;
+
 export type ShopeeOrderRow = {
   id: string;
   shop_id: number;
