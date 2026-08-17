@@ -362,6 +362,11 @@ export function SalesView({
                       {sale.products}
                     </p>
                   )}
+                  {sale.notes && (
+                    <p className="line-clamp-2 text-sm text-muted-foreground italic">
+                      {sale.notes}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -381,6 +386,7 @@ export function SalesView({
                   <TableHead className="text-base text-muted-foreground">% Markup</TableHead>
                   <TableHead className="text-base text-muted-foreground">% Margem</TableHead>
                   <TableHead className="text-base text-muted-foreground">Produtos</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Observação</TableHead>
                   <TableHead className="text-base text-muted-foreground">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -410,6 +416,9 @@ export function SalesView({
                     <TableCell className="max-w-[240px] truncate">
                       {sale.products}
                     </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                      {sale.notes}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={sale.status} />
                     </TableCell>
@@ -425,6 +434,7 @@ export function SalesView({
                   <TableCell>{formatCurrency(totalProfit)}</TableCell>
                   <TableCell>{formatPercent(avgProfitMargin)}</TableCell>
                   <TableCell>{formatPercent(avgSalesMargin)}</TableCell>
+                  <TableCell />
                   <TableCell />
                   <TableCell />
                 </TableRow>

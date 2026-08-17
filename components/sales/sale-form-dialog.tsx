@@ -367,6 +367,17 @@ export function SaleFormDialog({
               </RadioGroup>
             </div>
 
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="notes">Observação</Label>
+              <Textarea
+                id="notes"
+                name="notes"
+                placeholder="Alguma observação sobre esta venda? (opcional)"
+                rows={3}
+                defaultValue={sale?.notes ?? ""}
+              />
+            </div>
+
             {isItemized ? (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">

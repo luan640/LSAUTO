@@ -13,6 +13,7 @@ function parseSaleInput(formData: FormData): SaleInput {
     delivery_type: String(formData.get("delivery_type")) as SaleInput["delivery_type"],
     cost: Number(formData.get("cost")) || 0,
     products: String(formData.get("products") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
   };
 }
 

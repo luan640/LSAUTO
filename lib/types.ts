@@ -28,6 +28,7 @@ export type Sale = {
   products: string;
   status: SaleStatus;
   cancel_reason: string;
+  notes: string;
   created_by: string;
   created_at: string;
   updated_at: string;

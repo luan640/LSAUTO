@@ -182,7 +182,14 @@ export function DashboardView({
     };
   }, [filtered, totalExpenses]);
 
-  const balance = summary.profit - totalStockValue + totalBalanceAdjustments;
+  const allTimeProfit = useMemo(() => {
+    const totalSales = activeSales.reduce((acc, s) => acc + s.sale_value, 0);
+    const totalCost = activeSales.reduce((acc, s) => acc + s.cost, 0);
+    const totalExpensesAllTime = expenses.reduce((acc, e) => acc + e.amount, 0);
+    return totalSales - totalCost - totalExpensesAllTime;
+  }, [activeSales, expenses]);
+
+  const balance = allTimeProfit - totalStockValue + totalBalanceAdjustments;
 
   const monthly = useMemo(() => {
     const map = new Map<string, { revenue: number; profit: number }>();
@@ -393,7 +400,7 @@ export function DashboardView({
               {formatCurrency(balance)}
             </span>
             <span className="text-xs text-muted-foreground">
-              Lucro - Total em estoque + Ajustes
+              Lucro total - Total em estoque + Ajustes (não depende do período)
             </span>
           </CardContent>
         </Card>
