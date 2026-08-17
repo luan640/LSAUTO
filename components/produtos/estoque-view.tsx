@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,17 +20,20 @@ import type { LsStockSummary } from "@/lib/types";
 
 export function EstoqueView({ summary }: { summary: LsStockSummary[] }) {
   const [search, setSearch] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
 
   const filteredSummary = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return summary;
 
-    return summary.filter(
-      (item) =>
+    return summary.filter((item) => {
+      if (onlyAvailable && item.quantity <= 0) return false;
+      if (!query) return true;
+      return (
         item.product_name.toLowerCase().includes(query) ||
-        item.product_sku.toLowerCase().includes(query),
-    );
-  }, [summary, search]);
+        item.product_sku.toLowerCase().includes(query)
+      );
+    });
+  }, [summary, search, onlyAvailable]);
 
   const totalQuantity = filteredSummary.reduce((acc, item) => acc + item.quantity, 0);
   const totalValue = filteredSummary.reduce((acc, item) => acc + item.total_value, 0);
@@ -48,16 +52,29 @@ export function EstoqueView({ summary }: { summary: LsStockSummary[] }) {
         </Card>
       ) : (
         <>
-          {/* Filtro */}
+          {/* Filtros */}
           <Card>
-            <CardContent className="flex flex-col gap-2 py-4">
-              <Label htmlFor="filter_search">Produto ou SKU</Label>
-              <Input
-                id="filter_search"
-                placeholder="Buscar por nome ou SKU"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <CardContent className="flex flex-col gap-4 py-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="filter_search">Produto ou SKU</Label>
+                <Input
+                  id="filter_search"
+                  placeholder="Buscar por nome ou SKU"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <label
+                htmlFor="filter_only_available"
+                className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+              >
+                <Checkbox
+                  id="filter_only_available"
+                  checked={onlyAvailable}
+                  onCheckedChange={setOnlyAvailable}
+                />
+                Somente disponível em estoque
+              </label>
             </CardContent>
           </Card>
 
