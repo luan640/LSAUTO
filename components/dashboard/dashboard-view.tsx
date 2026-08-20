@@ -12,6 +12,7 @@ import {
   parseISO,
   format,
   eachDayOfInterval,
+  differenceInCalendarDays,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -181,6 +182,24 @@ export function DashboardView({
       averageTicket: count > 0 ? totalSales / count : 0,
     };
   }, [filtered, totalExpenses]);
+
+  // Dias cobertos pelo período selecionado (não pelos dias que tiveram venda),
+  // pra refletir o ritmo médio de vendas mesmo em dias sem nenhuma venda.
+  const averageSalesPerDay = useMemo(() => {
+    if (filtered.length === 0) return 0;
+
+    const dates = filtered.map((sale) => parseISO(sale.sale_date));
+    const earliestSale = dates.reduce((a, b) => (a < b ? a : b));
+    const latestSale = dates.reduce((a, b) => (a > b ? a : b));
+    const today = new Date();
+
+    const { start, end } = periodRange(period, customStart, customEnd);
+    const startDate = start ? parseISO(start) : earliestSale;
+    const endDate = end ? parseISO(end) : isAfter(today, latestSale) ? today : latestSale;
+
+    const days = differenceInCalendarDays(endDate, startDate) + 1;
+    return filtered.length / Math.max(days, 1);
+  }, [filtered, period, customStart, customEnd]);
 
   const allTimeProfit = useMemo(() => {
     const totalSales = activeSales.reduce((acc, s) => acc + s.sale_value, 0);
@@ -356,6 +375,19 @@ export function DashboardView({
           </CardHeader>
           <CardContent className="text-xl font-semibold md:text-2xl">
             {summary.count}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Qtd. média de vendas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span className="text-xl font-semibold md:text-2xl">
+              {averageSalesPerDay.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+            </span>
+            <span className="text-xs text-muted-foreground">Vendas por dia no período</span>
           </CardContent>
         </Card>
         <Card>
