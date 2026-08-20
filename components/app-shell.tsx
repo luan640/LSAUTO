@@ -252,7 +252,7 @@ export function AppShell({
         </form>
       </header>
 
-      <main className="flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-center border-t bg-background md:hidden">
