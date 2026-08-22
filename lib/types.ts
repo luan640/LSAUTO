@@ -22,6 +22,7 @@ export type Sale = {
   id: string;
   sale_date: string;
   sale_value: number;
+  discount: number;
   payment_method: PaymentMethod;
   delivery_type: DeliveryType;
   cost: number;
@@ -29,14 +30,17 @@ export type Sale = {
   status: SaleStatus;
   cancel_reason: string;
   notes: string;
+  receipt_notes: string;
+  customer_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+  customer?: LsCustomer | null;
 };
 
 export type SaleInput = Omit<
   Sale,
-  "id" | "status" | "cancel_reason" | "created_by" | "created_at" | "updated_at"
+  "id" | "status" | "cancel_reason" | "created_by" | "created_at" | "updated_at" | "customer"
 >;
 
 export type SupplierAccess = {
@@ -221,13 +225,41 @@ export type LsProduct = {
   id: string;
   name: string;
   sku: string;
+  brand_id: string | null;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  brand?: LsBrand | null;
+};
+
+export type LsProductInput = Omit<
+  LsProduct,
+  "id" | "created_by" | "created_at" | "updated_at" | "brand" | "active"
+>;
+
+export type LsBrand = {
+  id: string;
+  name: string;
   created_by: string;
   created_at: string;
   updated_at: string;
 };
 
-export type LsProductInput = Omit<
-  LsProduct,
+export type LsBrandInput = Omit<LsBrand, "id" | "created_by" | "created_at" | "updated_at">;
+
+export type LsCustomer = {
+  id: string;
+  name: string;
+  cpf: string;
+  phone: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LsCustomerInput = Omit<
+  LsCustomer,
   "id" | "created_by" | "created_at" | "updated_at"
 >;
 
@@ -274,6 +306,7 @@ export type LsSaleItem = {
   quantity: number;
   unit_cost: number;
   created_at: string;
+  product?: LsProduct | null;
 };
 
 export type LsStockSummary = {
@@ -284,6 +317,7 @@ export type LsStockSummary = {
   total_value: number;
   average_value: number;
   last_entry_value: number;
+  product_active: boolean;
 };
 
 export type LsBalanceAdjustment = {

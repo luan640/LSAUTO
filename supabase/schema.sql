@@ -507,6 +507,11 @@ create table if not exists public.ls_products (
   updated_at timestamptz not null default now()
 );
 
+-- Produto nunca é excluído (teria que apagar histórico de entradas/vendas
+-- vinculado); "excluir" na tela de Produtos só desativa.
+alter table public.ls_products
+  add column if not exists active boolean not null default true;
+
 drop trigger if exists set_ls_products_updated_at on public.ls_products;
 create trigger set_ls_products_updated_at
   before update on public.ls_products
@@ -522,6 +527,40 @@ create policy "Authenticated users can manage ls products"
   to authenticated
   using (true)
   with check (true);
+
+-- Marcas dos produtos da Auto Peças LS.
+create table if not exists public.ls_brands (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists set_ls_brands_updated_at on public.ls_brands;
+create trigger set_ls_brands_updated_at
+  before update on public.ls_brands
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.ls_brands enable row level security;
+
+drop policy if exists "Authenticated users can manage ls brands" on public.ls_brands;
+create policy "Authenticated users can manage ls brands"
+  on public.ls_brands
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+grant select, insert, update, delete on public.ls_brands to authenticated;
+
+-- Vínculo opcional entre produto e marca cadastrada (on delete set null: excluir
+-- a marca não apaga o produto, só desvincula).
+alter table public.ls_products
+  add column if not exists brand_id uuid references public.ls_brands (id) on delete set null;
+
+create index if not exists ls_products_brand_id_idx on public.ls_products (brand_id);
 
 -- Entradas de itens (extrato de compras) da Auto Peças LS. O fornecedor reaproveita
 -- o cadastro de Fornecedores já existente (supplier_accesses).
@@ -619,7 +658,8 @@ select
     then round(e.total_value / e.qty, 2)
     else 0
   end as average_value,
-  coalesce(le.unit_value, 0) as last_entry_value
+  coalesce(le.unit_value, 0) as last_entry_value,
+  p.active as product_active
 from public.ls_products p
 left join (
   select product_id, sum(quantity) as qty, sum(quantity * unit_value) as total_value
@@ -671,4 +711,52 @@ create policy "Authenticated users can manage ls balance adjustments"
   with check (true);
 
 grant select, insert, update, delete on public.ls_balance_adjustments to authenticated;
+
+-- Clientes da Auto Peças LS. Uma venda pode opcionalmente ser vinculada a um
+-- cliente cadastrado aqui, pra sair o nome/CPF no recibo em vez de em branco.
+create table if not exists public.ls_customers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  cpf text not null,
+  phone text not null default '',
+  created_by uuid references auth.users (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists set_ls_customers_updated_at on public.ls_customers;
+create trigger set_ls_customers_updated_at
+  before update on public.ls_customers
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.ls_customers enable row level security;
+
+drop policy if exists "Authenticated users can manage ls customers" on public.ls_customers;
+create policy "Authenticated users can manage ls customers"
+  on public.ls_customers
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+grant select, insert, update, delete on public.ls_customers to authenticated;
+
+-- Vínculo opcional entre venda e cliente cadastrado (on delete set null: excluir
+-- o cliente não apaga o histórico de vendas, só desvincula).
+alter table public.sales
+  add column if not exists customer_id uuid references public.ls_customers (id) on delete set null;
+
+create index if not exists sales_customer_id_idx on public.sales (customer_id);
+
+-- Desconto aplicado sobre a venda. sale_value guarda o valor líquido (já com o
+-- desconto descontado); discount fica só pra reconstruir o subtotal bruto na
+-- edição e exibir "SUBTOTAL / DESCONTO / TOTAL" no recibo.
+alter table public.sales
+  add column if not exists discount numeric(10, 2) not null default 0;
+
+-- notes é a observação interna (nunca aparece no recibo impresso); receipt_notes
+-- é o que sai no campo "OBSERVAÇÕES" do recibo entregue ao cliente.
+alter table public.sales
+  add column if not exists receipt_notes text not null default '';
 

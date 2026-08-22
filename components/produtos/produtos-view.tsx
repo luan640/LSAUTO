@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -15,12 +17,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductFormDialog } from "./product-form-dialog";
-import type { LsProduct } from "@/lib/types";
+import type { LsBrand, LsProduct } from "@/lib/types";
 
-export function ProdutosView({ products }: { products: LsProduct[] }) {
+export function ProdutosView({
+  products,
+  brandOptions = [],
+}: {
+  products: LsProduct[];
+  brandOptions?: LsBrand[];
+}) {
   const [open, setOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<LsProduct | null>(null);
   const [search, setSearch] = useState("");
+  const [hideInactive, setHideInactive] = useState(false);
 
   function openNew() {
     setEditingProduct(null);
@@ -34,13 +43,17 @@ export function ProdutosView({ products }: { products: LsProduct[] }) {
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return products;
 
-    return products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(query) || product.sku.toLowerCase().includes(query),
-    );
-  }, [products, search]);
+    return products.filter((product) => {
+      if (hideInactive && !product.active) return false;
+      if (!query) return true;
+      return (
+        product.name.toLowerCase().includes(query) ||
+        product.sku.toLowerCase().includes(query) ||
+        (product.brand?.name ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [products, search, hideInactive]);
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -62,14 +75,27 @@ export function ProdutosView({ products }: { products: LsProduct[] }) {
         <>
           {/* Filtro */}
           <Card>
-            <CardContent className="flex flex-col gap-2 py-4">
-              <Label htmlFor="filter_search">Produto ou SKU</Label>
-              <Input
-                id="filter_search"
-                placeholder="Buscar por nome ou SKU"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <CardContent className="flex flex-col gap-4 py-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="filter_search">Produto, SKU ou marca</Label>
+                <Input
+                  id="filter_search"
+                  placeholder="Buscar por nome, SKU ou marca"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <label
+                htmlFor="filter_hide_inactive"
+                className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+              >
+                <Checkbox
+                  id="filter_hide_inactive"
+                  checked={hideInactive}
+                  onCheckedChange={setHideInactive}
+                />
+                Ocultar produtos inativos
+              </label>
             </CardContent>
           </Card>
 
@@ -89,9 +115,21 @@ export function ProdutosView({ products }: { products: LsProduct[] }) {
                 className="cursor-pointer"
                 onClick={() => openEdit(product)}
               >
-                <CardContent className="flex items-center justify-between py-4">
-                  <span className="text-sm font-medium">{product.name}</span>
-                  <span className="text-sm text-muted-foreground">{product.sku}</span>
+                <CardContent className={cn("flex flex-col gap-1 py-4", !product.active && "opacity-60")}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{product.name}</span>
+                    <span className="text-sm text-muted-foreground">{product.sku}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {product.brand?.name ?? "—"}
+                    </span>
+                    {!product.active && (
+                      <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                        Inativo
+                      </span>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -104,17 +142,29 @@ export function ProdutosView({ products }: { products: LsProduct[] }) {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>SKU</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow
                     key={product.id}
-                    className="cursor-pointer"
+                    className={cn("cursor-pointer", !product.active && "opacity-60")}
                     onClick={() => openEdit(product)}
                   >
                     <TableCell>{product.name}</TableCell>
                     <TableCell>{product.sku}</TableCell>
+                    <TableCell>{product.brand?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {product.active ? (
+                        "Ativo"
+                      ) : (
+                        <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                          Inativo
+                        </span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -123,7 +173,12 @@ export function ProdutosView({ products }: { products: LsProduct[] }) {
         </>
       )}
 
-      <ProductFormDialog open={open} onOpenChange={setOpen} product={editingProduct} />
+      <ProductFormDialog
+        open={open}
+        onOpenChange={setOpen}
+        product={editingProduct}
+        brandOptions={brandOptions}
+      />
     </div>
   );
 }

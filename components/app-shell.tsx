@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(app)/actions";
 import { SaleFormDialog } from "@/components/sales/sale-form-dialog";
-import type { LsStockSummary } from "@/lib/types";
+import type { LsCustomer, LsStockSummary } from "@/lib/types";
 import {
   Sheet,
   SheetClose,
@@ -39,10 +39,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: Store,
     children: [
       { href: "/vendas", label: "Vendas" },
+      { href: "/clientes", label: "Clientes" },
       { href: "/orcamentos", label: "Orçamentos" },
       { href: "/despesas", label: "Despesas" },
       { href: "/dashboard", label: "Painel" },
       { href: "/produtos", label: "Produtos" },
+      { href: "/marcas", label: "Marcas" },
       { href: "/estoque", label: "Estoque" },
       { href: "/entradas", label: "Entrada de Itens" },
       { href: "/fornecedores", label: "Fornecedores" },
@@ -135,10 +137,12 @@ function MobileNavItem({ item, pathname }: { item: NavItem; pathname: string }) 
 export function AppShell({
   email,
   stockOptions,
+  customerOptions,
   children,
 }: {
   email: string;
   stockOptions: LsStockSummary[];
+  customerOptions: LsCustomer[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -283,6 +287,7 @@ export function AppShell({
         onOpenChange={setNewSaleOpen}
         sale={null}
         stockOptions={stockOptions}
+        customerOptions={customerOptions}
       />
     </div>
   );

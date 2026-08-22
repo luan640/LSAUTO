@@ -6,14 +6,19 @@ import type { SaleInput } from "@/lib/types";
 import { computeLifoCosts, type LedgerEvent } from "@/lib/stock/lifo-cost";
 
 function parseSaleInput(formData: FormData): SaleInput {
+  const customerId = String(formData.get("customer_id") ?? "");
+
   return {
     sale_date: String(formData.get("sale_date")),
     sale_value: Number(formData.get("sale_value")),
+    discount: Number(formData.get("discount")) || 0,
     payment_method: String(formData.get("payment_method")) as SaleInput["payment_method"],
     delivery_type: String(formData.get("delivery_type")) as SaleInput["delivery_type"],
     cost: Number(formData.get("cost")) || 0,
     products: String(formData.get("products") ?? ""),
     notes: String(formData.get("notes") ?? ""),
+    receipt_notes: String(formData.get("receipt_notes") ?? ""),
+    customer_id: customerId || null,
   };
 }
 

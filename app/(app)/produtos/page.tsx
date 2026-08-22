@@ -1,17 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProdutosView } from "@/components/produtos/produtos-view";
-import type { LsProduct } from "@/lib/types";
+import type { LsBrand, LsProduct } from "@/lib/types";
 
 export default async function ProdutosPage() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("ls_products")
-    .select("*")
-    .order("name", { ascending: true });
+  const [productsRes, brandsRes] = await Promise.all([
+    supabase
+      .from("ls_products")
+      .select("*, brand:ls_brands(*)")
+      .order("name", { ascending: true }),
+    supabase.from("ls_brands").select("*").order("name", { ascending: true }),
+  ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (productsRes.error) {
+    throw new Error(productsRes.error.message);
+  }
+  if (brandsRes.error) {
+    throw new Error(brandsRes.error.message);
   }
 
-  return <ProdutosView products={(data ?? []) as LsProduct[]} />;
+  return (
+    <ProdutosView
+      products={(productsRes.data ?? []) as LsProduct[]}
+      brandOptions={(brandsRes.data ?? []) as LsBrand[]}
+    />
+  );
 }

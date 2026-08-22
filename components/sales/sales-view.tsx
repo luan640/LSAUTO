@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Filter, Plus } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Filter, Loader2, Plus, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -33,8 +34,17 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate, formatPercent, profitMargin, salesMargin } from "@/lib/format";
+import { buildReceiptNumberMap } from "@/lib/receipt/receipt-number";
+import { renderNodeToPdf } from "@/lib/receipt/render-node-to-pdf";
 import { SaleFormDialog } from "./sale-form-dialog";
-import { PAYMENT_METHODS, type LsSaleItem, type LsStockSummary, type Sale } from "@/lib/types";
+import { SaleReceiptTemplate } from "./sale-receipt-template";
+import {
+  PAYMENT_METHODS,
+  type LsCustomer,
+  type LsSaleItem,
+  type LsStockSummary,
+  type Sale,
+} from "@/lib/types";
 
 const ALL_PAYMENT_METHODS = "todos";
 
@@ -59,10 +69,12 @@ export function SalesView({
   sales,
   stockOptions,
   saleItems,
+  customerOptions,
 }: {
   sales: Sale[];
   stockOptions: LsStockSummary[];
   saleItems: LsSaleItem[];
+  customerOptions: LsCustomer[];
 }) {
   const [open, setOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -72,6 +84,10 @@ export function SalesView({
   const [paymentMethod, setPaymentMethod] = useState<string>(ALL_PAYMENT_METHODS);
   const [product, setProduct] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [exportingSale, setExportingSale] = useState<Sale | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const receiptNumberBySaleId = useMemo(() => buildReceiptNumberMap(sales), [sales]);
 
   function openNew() {
     setEditingSale(null);
@@ -83,9 +99,35 @@ export function SalesView({
     setOpen(true);
   }
 
+  async function handleEmitReceipt(sale: Sale) {
+    setExportingSale(sale);
+    // Espera o template do recibo (fora da tela) renderizar com os dados da
+    // venda antes de capturar — dois rAF garantem que o commit já pintou.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+
+    try {
+      if (!receiptRef.current) {
+        throw new Error("Não foi possível montar o recibo");
+      }
+      const receiptNumber = receiptNumberBySaleId.get(sale.id) ?? "00000";
+      await renderNodeToPdf(receiptRef.current, `recibo-venda-${receiptNumber}.pdf`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao gerar o recibo");
+    } finally {
+      setExportingSale(null);
+    }
+  }
+
   const editingSaleItems = useMemo(
     () => saleItems.filter((item) => item.sale_id === editingSale?.id),
     [saleItems, editingSale],
+  );
+
+  const exportingSaleItems = useMemo(
+    () => saleItems.filter((item) => item.sale_id === exportingSale?.id),
+    [saleItems, exportingSale],
   );
 
   const filteredSales = useMemo(() => {
@@ -115,6 +157,8 @@ export function SalesView({
   );
 
   const totalValue = countedSales.reduce((acc, sale) => acc + sale.sale_value, 0);
+
+  const totalDiscount = countedSales.reduce((acc, sale) => acc + (sale.discount ?? 0), 0);
 
   const totalCost = countedSales.reduce((acc, sale) => acc + sale.cost, 0);
 
@@ -328,10 +372,32 @@ export function SalesView({
                     <span className="text-sm font-medium">
                       {formatDate(sale.sale_date)}
                     </span>
-                    <span className="text-base font-semibold">
-                      {formatCurrency(sale.sale_value)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-semibold">
+                        {formatCurrency(sale.sale_value)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Emitir recibo"
+                        disabled={exportingSale?.id === sale.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEmitReceipt(sale);
+                        }}
+                      >
+                        {exportingSale?.id === sale.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Receipt className="size-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
+                  {sale.customer?.name && (
+                    <span className="text-sm text-muted-foreground">{sale.customer.name}</span>
+                  )}
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{sale.payment_method}</Badge>
                     <Badge variant="outline">
@@ -340,6 +406,10 @@ export function SalesView({
                     <StatusBadge status={sale.status} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs text-muted-foreground">Desconto</span>
+                      <span>{sale.discount ? formatCurrency(sale.discount) : "—"}</span>
+                    </div>
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-xs text-muted-foreground">Custo</span>
                       <span>{formatCurrency(sale.cost)}</span>
@@ -378,7 +448,9 @@ export function SalesView({
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-base text-muted-foreground">Data</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Cliente</TableHead>
                   <TableHead className="text-base text-muted-foreground">Valor</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Desconto</TableHead>
                   <TableHead className="text-base text-muted-foreground">Pagamento</TableHead>
                   <TableHead className="text-base text-muted-foreground">Entrega</TableHead>
                   <TableHead className="text-base text-muted-foreground">Custo</TableHead>
@@ -388,6 +460,7 @@ export function SalesView({
                   <TableHead className="text-base text-muted-foreground">Produtos</TableHead>
                   <TableHead className="text-base text-muted-foreground">Observação</TableHead>
                   <TableHead className="text-base text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Recibo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -398,7 +471,9 @@ export function SalesView({
                     onClick={() => openEdit(sale)}
                   >
                     <TableCell>{formatDate(sale.sale_date)}</TableCell>
+                    <TableCell>{sale.customer?.name ?? "—"}</TableCell>
                     <TableCell>{formatCurrency(sale.sale_value)}</TableCell>
+                    <TableCell>{sale.discount ? formatCurrency(sale.discount) : "—"}</TableCell>
                     <TableCell>{sale.payment_method}</TableCell>
                     <TableCell>
                       {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
@@ -422,18 +497,40 @@ export function SalesView({
                     <TableCell>
                       <StatusBadge status={sale.status} />
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Emitir recibo"
+                        disabled={exportingSale?.id === sale.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEmitReceipt(sale);
+                        }}
+                      >
+                        {exportingSale?.id === sale.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Receipt className="size-4" />
+                        )}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell>Total</TableCell>
+                  <TableCell />
                   <TableCell>{formatCurrency(totalValue)}</TableCell>
+                  <TableCell>{formatCurrency(totalDiscount)}</TableCell>
                   <TableCell colSpan={2} />
                   <TableCell>{formatCurrency(totalCost)}</TableCell>
                   <TableCell>{formatCurrency(totalProfit)}</TableCell>
                   <TableCell>{formatPercent(avgProfitMargin)}</TableCell>
                   <TableCell>{formatPercent(avgSalesMargin)}</TableCell>
+                  <TableCell />
                   <TableCell />
                   <TableCell />
                   <TableCell />
@@ -450,7 +547,20 @@ export function SalesView({
         sale={editingSale}
         stockOptions={stockOptions}
         saleItems={editingSaleItems}
+        customerOptions={customerOptions}
       />
+
+      {/* Template do recibo, renderizado fora da tela só pra ser capturado em PDF */}
+      {exportingSale && (
+        <div style={{ position: "fixed", top: 0, left: -10000, zIndex: -1 }}>
+          <SaleReceiptTemplate
+            ref={receiptRef}
+            sale={exportingSale}
+            saleItems={exportingSaleItems}
+            receiptNumber={receiptNumberBySaleId.get(exportingSale.id) ?? "00000"}
+          />
+        </div>
+      )}
     </div>
   );
 }
