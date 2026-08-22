@@ -168,7 +168,7 @@ export function EntradaFormDialog({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="unit_value">Valor de compra (R$)</Label>
+              <Label htmlFor="unit_value">Valor unitário (R$)</Label>
               <Input
                 id="unit_value"
                 name="unit_value"

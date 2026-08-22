@@ -317,31 +317,35 @@ export const SaleReceiptTemplate = forwardRef<
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", borderRadius: 14, overflow: "hidden", border: "1px solid #e5e5e5", height: "fit-content" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "14px 20px",
-              fontWeight: 800,
-              fontSize: 15,
-            }}
-          >
-            <span>SUBTOTAL</span>
-            <span>{formatCurrencyPlain(subtotal)}</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "14px 20px",
-              fontWeight: 800,
-              fontSize: 15,
-              borderTop: "1px solid #e5e5e5",
-            }}
-          >
-            <span>DESCONTO</span>
-            <span>{discount > 0 ? `- ${formatCurrencyPlain(discount)}` : "R$ 0,00"}</span>
-          </div>
+          {discount > 0 && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "14px 20px",
+                  fontWeight: 800,
+                  fontSize: 15,
+                }}
+              >
+                <span>SUBTOTAL</span>
+                <span>{formatCurrencyPlain(subtotal)}</span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "14px 20px",
+                  fontWeight: 800,
+                  fontSize: 15,
+                  borderTop: "1px solid #e5e5e5",
+                }}
+              >
+                <span>DESCONTO</span>
+                <span>{`- ${formatCurrencyPlain(discount)}`}</span>
+              </div>
+            </>
+          )}
           <div
             style={{
               display: "flex",
