@@ -18,6 +18,7 @@ import {
   Package,
   Warehouse,
   PackagePlus,
+  Undo2,
   ShoppingCart,
   ShoppingBag,
   FileText,
@@ -70,6 +71,7 @@ const COMPANIES: Company[] = [
           { href: "/produtos", label: "Produtos", icon: Package },
           { href: "/estoque", label: "Estoque", icon: Warehouse },
           { href: "/entradas", label: "Entrada de Itens", icon: PackagePlus },
+          { href: "/devolucoes", label: "Devoluções", icon: Undo2 },
         ],
       },
       {

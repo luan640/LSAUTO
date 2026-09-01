@@ -640,6 +640,16 @@ create policy "Authenticated users can manage ls stock exits"
   using (true)
   with check (true);
 
+-- Crédito de fornecedor: quando reason = 'devolucao_fornecedor', o fornecedor
+-- não devolve o dinheiro da devolução, e sim deixa um crédito para uso futuro.
+alter table public.ls_stock_exits
+  add column if not exists supplier_id uuid references public.supplier_accesses (id) on delete set null;
+
+alter table public.ls_stock_exits
+  add column if not exists credit_amount numeric(10, 2) not null default 0 check (credit_amount >= 0);
+
+create index if not exists ls_stock_exits_supplier_id_idx on public.ls_stock_exits (supplier_id);
+
 -- View de estoque consolidado (mesma lógica da cf_moto_stock_summary)
 create or replace view public.ls_stock_summary
 with (security_invoker = true) as

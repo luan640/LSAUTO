@@ -113,11 +113,15 @@ export function DashboardView({
   expenses,
   totalStockValue,
   totalBalanceAdjustments,
+  totalSupplierCredit,
+  creditBySupplier,
 }: {
   sales: Sale[];
   expenses: Expense[];
   totalStockValue: number;
   totalBalanceAdjustments: number;
+  totalSupplierCredit: number;
+  creditBySupplier: { name: string; total: number }[];
 }) {
   const [period, setPeriod] = useState<PeriodKey>("mes_atual");
   const [customStart, setCustomStart] = useState("");
@@ -436,7 +440,36 @@ export function DashboardView({
             </span>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Crédito com fornecedores
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            <span className="text-xl font-semibold md:text-2xl">
+              {formatCurrency(totalSupplierCredit)}
+            </span>
+            <span className="text-xs text-muted-foreground">Não depende do período</span>
+          </CardContent>
+        </Card>
       </div>
+
+      {creditBySupplier.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Crédito por fornecedor</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {creditBySupplier.map((item) => (
+              <div key={item.name} className="flex items-center justify-between text-sm">
+                <span className="truncate">{item.name}</span>
+                <span className="font-medium">{formatCurrency(item.total)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

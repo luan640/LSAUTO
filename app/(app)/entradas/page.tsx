@@ -14,6 +14,7 @@ export default async function EntradasPage() {
     supabase
       .from("ls_stock_exits")
       .select("*, product:ls_products(*)")
+      .neq("reason", "devolucao_fornecedor")
       .order("exit_date", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase.from("ls_products").select("*").order("name", { ascending: true }),

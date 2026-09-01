@@ -16,17 +16,25 @@ function parseLsStockEntryInput(formData: FormData): LsStockEntryInput {
   };
 }
 
+// Devolução ao fornecedor tem tela própria (/devolucoes), pois sempre exige
+// fornecedor e valor de crédito — aqui só ficam os motivos genéricos.
+const GENERIC_STOCK_EXIT_REASONS = STOCK_EXIT_REASONS.filter(
+  (reason) => reason !== "devolucao_fornecedor",
+);
+
 function parseLsStockExitInput(formData: FormData): LsStockExitInput {
   const reason = String(formData.get("reason") ?? "");
 
   return {
     product_id: String(formData.get("product_id") ?? ""),
     quantity: Number(formData.get("quantity")) || 0,
-    reason: (STOCK_EXIT_REASONS as readonly string[]).includes(reason)
+    reason: (GENERIC_STOCK_EXIT_REASONS as readonly string[]).includes(reason)
       ? (reason as StockExitReason)
       : "ajuste_estoque",
     exit_date: String(formData.get("exit_date") ?? ""),
     notes: String(formData.get("notes") ?? ""),
+    supplier_id: null,
+    credit_amount: 0,
   };
 }
 

@@ -289,14 +289,17 @@ export type LsStockExit = {
   reason: StockExitReason;
   exit_date: string;
   notes: string;
+  supplier_id: string | null;
+  credit_amount: number;
   created_by: string;
   created_at: string;
   product?: LsProduct;
+  supplier?: SupplierAccess | null;
 };
 
 export type LsStockExitInput = Omit<
   LsStockExit,
-  "id" | "created_by" | "created_at" | "product"
+  "id" | "created_by" | "created_at" | "product" | "supplier"
 >;
 
 export type LsSaleItem = {
