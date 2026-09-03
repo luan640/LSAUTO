@@ -248,7 +248,7 @@ export function SaleFormDialog({
             product_id: item.product!.value,
             quantity: Number(item.quantity),
           })),
-          { excludeSaleId: sale?.id, asOfCreatedAt: sale?.created_at },
+          { excludeSaleId: sale?.id },
         );
 
         setItemCosts(
@@ -261,7 +261,7 @@ export function SaleFormDialog({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsSignature, sale?.id, sale?.created_at, isItemized, isCancelled]);
+  }, [itemsSignature, sale?.id, isItemized, isCancelled]);
 
   const computedCost = items.reduce((acc, item) => {
     if (!item.product) return acc;

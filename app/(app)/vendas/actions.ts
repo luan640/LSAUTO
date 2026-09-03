@@ -98,16 +98,16 @@ async function assertStockAvailable(
   }
 }
 
-// Simula o consumo de estoque em pilha (LIFO) até o momento da venda (asOfCreatedAt)
-// e monta os itens com o custo resultante "congelado" no momento da venda. Quando a
-// quantidade vendida excede o que a última compra tinha disponível, o restante é
-// puxado das compras anteriores (mais recentes primeiro).
+// Simula o consumo de estoque em pilha (LIFO) com base no estado atual do estoque
+// (todas as entradas, vendas e saídas já registradas) e monta os itens com o custo
+// resultante. Quando a quantidade vendida excede o que a última compra tinha
+// disponível, o restante é puxado das compras anteriores (mais recentes primeiro).
 async function buildSaleItemsWithCost(
   supabase: Awaited<ReturnType<typeof createClient>>,
   items: SaleItemInput[],
-  options: { asOfCreatedAt?: string; excludeSaleId?: string } = {},
+  options: { excludeSaleId?: string } = {},
 ) {
-  const asOf = options.asOfCreatedAt ?? new Date().toISOString();
+  const asOf = new Date().toISOString();
   const productIds = [...new Set(items.map((item) => item.product_id))];
 
   const [
@@ -192,7 +192,7 @@ async function buildSaleItemsWithCost(
 // de venda para exibir o custo real antes de salvar.
 export async function previewSaleItemsCost(
   items: SaleItemInput[],
-  options: { excludeSaleId?: string; asOfCreatedAt?: string } = {},
+  options: { excludeSaleId?: string } = {},
 ) {
   const supabase = await createClient();
   return buildSaleItemsWithCost(supabase, items, options);
@@ -270,20 +270,9 @@ export async function updateSale(id: string, formData: FormData) {
   const sale = parseSaleInput(formData);
 
   if (items.length > 0) {
-    const { data: existingSale, error: existingSaleError } = await supabase
-      .from("sales")
-      .select("created_at")
-      .eq("id", id)
-      .single();
-
-    if (existingSaleError) {
-      throw new Error(existingSaleError.message);
-    }
-
     await assertStockAvailable(supabase, items, id);
 
     const itemsWithCost = await buildSaleItemsWithCost(supabase, items, {
-      asOfCreatedAt: existingSale.created_at,
       excludeSaleId: id,
     });
     sale.cost = itemsWithCost.reduce((acc, item) => acc + item.quantity * item.unit_cost, 0);
