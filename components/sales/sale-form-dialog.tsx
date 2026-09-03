@@ -220,6 +220,17 @@ export function SaleFormDialog({
     setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
+  // Um mesmo produto não pode aparecer em duas linhas da venda: cada combobox
+  // esconde os produtos já escolhidos nas outras linhas.
+  function productOptionsForRow(rowKey: string) {
+    const chosenElsewhere = new Set(
+      items
+        .filter((item) => item.key !== rowKey && item.product)
+        .map((item) => item.product!.value),
+    );
+    return selectableProductOptions.filter((option) => !chosenElsewhere.has(option.value));
+  }
+
   const itemsSignature = items
     .map((item) => `${item.product?.value ?? ""}:${item.quantity}`)
     .join("|");
@@ -297,6 +308,19 @@ export function SaleFormDialog({
           `Quantidade maior que o estoque disponível: ${stockOverflowItems
             .map((item) => item.product!.label.split(" · ")[0])
             .join(", ")}`,
+        );
+        return;
+      }
+
+      const seenProductIds = new Set<string>();
+      const duplicateProduct = validItems.find((item) => {
+        if (seenProductIds.has(item.product!.value)) return true;
+        seenProductIds.add(item.product!.value);
+        return false;
+      });
+      if (duplicateProduct) {
+        toast.error(
+          `"${duplicateProduct.product!.label.split(" · ")[0]}" foi selecionado em mais de uma linha`,
         );
         return;
       }
@@ -555,7 +579,7 @@ export function SaleFormDialog({
                         <div className="flex flex-col gap-2">
                           <Label className="sm:hidden">Produto do estoque</Label>
                           <Combobox
-                            items={selectableProductOptions}
+                            items={productOptionsForRow(item.key)}
                             value={item.product}
                             onValueChange={(value) => updateItem(item.key, { product: value })}
                             autoHighlight

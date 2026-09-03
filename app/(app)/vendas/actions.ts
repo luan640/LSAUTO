@@ -28,9 +28,10 @@ function parseSaleItems(formData: FormData): SaleItemInput[] {
   const raw = String(formData.get("items") ?? "");
   if (!raw) return [];
 
+  let items: SaleItemInput[];
   try {
     const parsed = JSON.parse(raw) as { product_id?: unknown; quantity?: unknown }[];
-    return parsed
+    items = parsed
       .map((item) => ({
         product_id: String(item.product_id ?? ""),
         quantity: Number(item.quantity) || 0,
@@ -39,6 +40,13 @@ function parseSaleItems(formData: FormData): SaleItemInput[] {
   } catch {
     return [];
   }
+
+  const productIds = items.map((item) => item.product_id);
+  if (new Set(productIds).size !== productIds.length) {
+    throw new Error("Um mesmo produto não pode aparecer em mais de um item da venda");
+  }
+
+  return items;
 }
 
 // Garante que a quantidade vendida de cada produto não passe do estoque disponível
