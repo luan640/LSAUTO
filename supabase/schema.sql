@@ -474,9 +474,13 @@ left join (
   group by product_id
 ) e on e.product_id = p.id
 left join (
-  select product_id, sum(quantity) as qty, sum(quantity * unit_cost) as total_cost
-  from public.cf_moto_sale_items
-  group by product_id
+  -- Item de venda cancelada não conta como saída: a quantidade volta a ficar
+  -- disponível automaticamente assim que a venda é marcada como cancelada.
+  select si.product_id, sum(si.quantity) as qty, sum(si.quantity * si.unit_cost) as total_cost
+  from public.cf_moto_sale_items si
+  join public.cf_moto_sales sale on sale.id = si.sale_id
+  where sale.status <> 'cancelado'
+  group by si.product_id
 ) s on s.product_id = p.id
 left join (
   select product_id, sum(quantity) as qty
