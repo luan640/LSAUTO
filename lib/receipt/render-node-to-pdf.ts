@@ -23,26 +23,37 @@ export async function renderNodeToPdf(node: HTMLElement, filename: string) {
   ]);
   const { jsPDF } = await import("jspdf");
 
-  const scale = 2;
   const canvas = await html2canvas(node, {
-    scale,
+    scale: 2,
     backgroundColor: "#ffffff",
   });
 
-  // A página do PDF usa o tamanho "real" do recibo (sem a escala 2x, que serve
-  // só pra deixar a imagem mais nítida). Usar o canvas em escala 2x direto como
-  // tamanho de página deixava o PDF com o dobro do tamanho em cada dimensão —
-  // ao imprimir sem "ajustar à página", só o canto superior esquerdo cabia na
-  // folha.
-  const width = canvas.width / scale;
-  const height = canvas.height / scale;
-
+  // Página em tamanho A4 fixo (a escala 2x do canvas serve só pra nitidez da
+  // imagem, não define o tamanho da página). O recibo é escalado pra caber
+  // inteiro dentro da margem, preservando a proporção — assim ele sempre
+  // imprime numa página só, independente do tamanho em pixels do template na
+  // tela ou das configurações de impressão do visualizador.
+  const imageAspectRatio = canvas.width / canvas.height;
   const pdf = new jsPDF({
-    orientation: width >= height ? "landscape" : "portrait",
-    unit: "px",
-    format: [width, height],
+    orientation: imageAspectRatio >= 1 ? "landscape" : "portrait",
+    unit: "mm",
+    format: "a4",
   });
 
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, width, height);
+  const margin = 10;
+  const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+  const maxHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+
+  let renderWidth = maxWidth;
+  let renderHeight = renderWidth / imageAspectRatio;
+  if (renderHeight > maxHeight) {
+    renderHeight = maxHeight;
+    renderWidth = renderHeight * imageAspectRatio;
+  }
+
+  const x = margin + (maxWidth - renderWidth) / 2;
+  const y = margin + (maxHeight - renderHeight) / 2;
+
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, renderWidth, renderHeight);
   pdf.save(filename);
 }
