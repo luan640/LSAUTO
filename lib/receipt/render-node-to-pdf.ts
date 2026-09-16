@@ -23,17 +23,19 @@ export async function renderNodeToPdf(node: HTMLElement, filename: string) {
   ]);
   const { jsPDF } = await import("jspdf");
 
+  const scale = 2;
   const canvas = await html2canvas(node, {
-    scale: 2,
+    scale,
     backgroundColor: "#ffffff",
   });
 
-  // Usa as dimensões do próprio canvas (já na escala 2x) tanto pra página
-  // quanto pra imagem — assim não depende de nenhuma conversão de DPI do
-  // jsPDF para a unidade "px", que historicamente é inconsistente e cortava
-  // a borda direita do recibo.
-  const width = canvas.width;
-  const height = canvas.height;
+  // A página do PDF usa o tamanho "real" do recibo (sem a escala 2x, que serve
+  // só pra deixar a imagem mais nítida). Usar o canvas em escala 2x direto como
+  // tamanho de página deixava o PDF com o dobro do tamanho em cada dimensão —
+  // ao imprimir sem "ajustar à página", só o canto superior esquerdo cabia na
+  // folha.
+  const width = canvas.width / scale;
+  const height = canvas.height / scale;
 
   const pdf = new jsPDF({
     orientation: width >= height ? "landscape" : "portrait",
