@@ -29,10 +29,10 @@ export async function renderNodeToPdf(node: HTMLElement, filename: string) {
   });
 
   // Página em tamanho A4 fixo (a escala 2x do canvas serve só pra nitidez da
-  // imagem, não define o tamanho da página). O recibo é escalado pra caber
-  // inteiro dentro da margem, preservando a proporção — assim ele sempre
-  // imprime numa página só, independente do tamanho em pixels do template na
-  // tela ou das configurações de impressão do visualizador.
+  // imagem, não define o tamanho da página). O recibo ocupa só a metade
+  // superior da folha, preservando a proporção, deixando a metade de baixo em
+  // branco com uma linha pontilhada — dá pra cortar e sobra um recibo do
+  // tamanho de meia A4 em vez de folha inteira.
   const imageAspectRatio = canvas.width / canvas.height;
   const pdf = new jsPDF({
     orientation: imageAspectRatio >= 1 ? "landscape" : "portrait",
@@ -41,8 +41,10 @@ export async function renderNodeToPdf(node: HTMLElement, filename: string) {
   });
 
   const margin = 10;
-  const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-  const maxHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - margin * 2;
+  const maxHeight = pageHeight / 2 - margin * 1.5;
 
   let renderWidth = maxWidth;
   let renderHeight = renderWidth / imageAspectRatio;
@@ -52,8 +54,17 @@ export async function renderNodeToPdf(node: HTMLElement, filename: string) {
   }
 
   const x = margin + (maxWidth - renderWidth) / 2;
-  const y = margin + (maxHeight - renderHeight) / 2;
+  const y = margin;
 
   pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, renderWidth, renderHeight);
+
+  const cutY = pageHeight / 2;
+  pdf.setDrawColor(180);
+  pdf.setLineDashPattern([2, 2], 0);
+  pdf.line(margin, cutY, pageWidth - margin, cutY);
+  pdf.setFontSize(8);
+  pdf.setTextColor(150);
+  pdf.text("corte aqui", pageWidth / 2, cutY - 2, { align: "center" });
+
   pdf.save(filename);
 }
