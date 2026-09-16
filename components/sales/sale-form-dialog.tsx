@@ -292,6 +292,7 @@ export function SaleFormDialog({
     formData.set("delivery_type", delivery);
     formData.set("sale_value", String(totalValue));
     formData.set("discount", String(discountNumber));
+    formData.set("customer_id", customer.value);
 
     if (isItemized) {
       const validItems = items.filter(
