@@ -16,6 +16,38 @@ function parseLsStockEntryInput(formData: FormData): LsStockEntryInput {
   };
 }
 
+type LsStockEntryItemInput = { product_id: string; quantity: number; unit_value: number };
+
+function parseEntryItems(formData: FormData): LsStockEntryItemInput[] {
+  const raw = String(formData.get("items") ?? "");
+  if (!raw) return [];
+
+  let items: LsStockEntryItemInput[];
+  try {
+    const parsed = JSON.parse(raw) as {
+      product_id?: unknown;
+      quantity?: unknown;
+      unit_value?: unknown;
+    }[];
+    items = parsed
+      .map((item) => ({
+        product_id: String(item.product_id ?? ""),
+        quantity: Number(item.quantity) || 0,
+        unit_value: Number(item.unit_value) || 0,
+      }))
+      .filter((item) => item.product_id && item.quantity > 0);
+  } catch {
+    return [];
+  }
+
+  const productIds = items.map((item) => item.product_id);
+  if (new Set(productIds).size !== productIds.length) {
+    throw new Error("Um mesmo produto não pode aparecer em mais de um item da entrada");
+  }
+
+  return items;
+}
+
 // Devolução ao fornecedor tem tela própria (/devolucoes), pois sempre exige
 // fornecedor e valor de crédito — aqui só ficam os motivos genéricos.
 const GENERIC_STOCK_EXIT_REASONS = STOCK_EXIT_REASONS.filter(
@@ -79,17 +111,27 @@ async function assertExitStockAvailable(
   }
 }
 
-export async function createLsStockEntry(formData: FormData) {
+export async function createLsStockEntries(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const entry = parseLsStockEntryInput(formData);
+  const shared = parseLsStockEntryInput(formData);
+  const items = parseEntryItems(formData);
+  if (items.length === 0) {
+    throw new Error("Adicione ao menos um item à entrada");
+  }
 
-  const { error } = await supabase
-    .from("ls_stock_entries")
-    .insert({ ...entry, created_by: user?.id });
+  const { error } = await supabase.from("ls_stock_entries").insert(
+    items.map((item) => ({
+      ...shared,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_value: item.unit_value,
+      created_by: user?.id,
+    })),
+  );
 
   if (error) {
     throw new Error(error.message);

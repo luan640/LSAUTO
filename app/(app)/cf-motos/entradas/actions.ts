@@ -76,17 +76,59 @@ async function assertExitStockAvailable(
   }
 }
 
-export async function createCfMotoStockEntry(formData: FormData) {
+type CfMotoStockEntryItemInput = { product_id: string; quantity: number; unit_value: number };
+
+function parseCfMotoEntryItems(formData: FormData): CfMotoStockEntryItemInput[] {
+  const raw = String(formData.get("items") ?? "");
+  if (!raw) return [];
+
+  let items: CfMotoStockEntryItemInput[];
+  try {
+    const parsed = JSON.parse(raw) as {
+      product_id?: unknown;
+      quantity?: unknown;
+      unit_value?: unknown;
+    }[];
+    items = parsed
+      .map((item) => ({
+        product_id: String(item.product_id ?? ""),
+        quantity: Number(item.quantity) || 0,
+        unit_value: Number(item.unit_value) || 0,
+      }))
+      .filter((item) => item.product_id && item.quantity > 0);
+  } catch {
+    return [];
+  }
+
+  const productIds = items.map((item) => item.product_id);
+  if (new Set(productIds).size !== productIds.length) {
+    throw new Error("Um mesmo produto não pode aparecer em mais de um item da entrada");
+  }
+
+  return items;
+}
+
+export async function createCfMotoStockEntries(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const entry = parseCfMotoStockEntryInput(formData);
+  const shared = parseCfMotoStockEntryInput(formData);
+  const items = parseCfMotoEntryItems(formData);
+  if (items.length === 0) {
+    throw new Error("Adicione ao menos um item à entrada");
+  }
 
-  const { error } = await supabase
-    .from("cf_moto_stock_entries")
-    .insert({ ...entry, created_by: user?.id });
+  const { error } = await supabase.from("cf_moto_stock_entries").insert(
+    items.map((item) => ({
+      ...shared,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_value: item.unit_value,
+      created_by: user?.id,
+    })),
+  );
 
   if (error) {
     throw new Error(error.message);
