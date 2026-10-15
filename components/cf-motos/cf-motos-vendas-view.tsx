@@ -152,6 +152,7 @@ export function CfMotosVendasView({
   }, [expenses, dateFrom, dateTo]);
 
   const totalExpenses = filteredExpenses.reduce((acc, expense) => acc + expense.amount, 0);
+  const netProfit = totalProfit - totalExpenses;
 
   const activeFiltersCount = [
     dateFrom !== defaultRange.from ? dateFrom : "",
@@ -246,7 +247,7 @@ export function CfMotosVendasView({
           <div className="flex items-center justify-between md:hidden">
             <span className="text-sm font-medium text-muted-foreground">Lucro total</span>
             <div className="flex items-center gap-3">
-              <span className="text-base font-semibold">{formatCurrency(totalProfit)}</span>
+              <span className="text-base font-semibold">{formatCurrency(netProfit)}</span>
               <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                 <SheetTrigger
                   render={<Button variant="outline" size="icon" className="relative" />}
@@ -339,7 +340,7 @@ export function CfMotosVendasView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xl font-semibold md:text-2xl">
-                {formatCurrency(totalProfit)}
+                {formatCurrency(netProfit)}
               </CardContent>
             </Card>
             <Card>
