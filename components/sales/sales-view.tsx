@@ -101,6 +101,26 @@ function percentChange(current: number, previous: number): number | null {
   return (current - previous) / previous;
 }
 
+// Projeta o lucro do mês corrente inteiro a partir do ritmo até hoje
+// (lucro acumulado do mês / dias já passados * dias totais do mês).
+// Independe dos filtros de período escolhidos pelo usuário.
+function currentMonthProfitForecast(sales: Sale[]) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysElapsed = now.getDate();
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const from = toIso(monthStart);
+  const to = toIso(now);
+
+  const profitSoFar = sales
+    .filter((sale) => sale.status !== "cancelado" && sale.sale_date >= from && sale.sale_date <= to)
+    .reduce((acc, sale) => acc + (sale.sale_value - sale.cost), 0);
+
+  return daysElapsed > 0 ? (profitSoFar / daysElapsed) * daysInMonth : 0;
+}
+
 function saleMatchesFilters(
   sale: Sale,
   filters: { from: string; to: string; paymentMethod: string; productQuery: string; customerQuery: string },
@@ -151,6 +171,7 @@ function StatCard({
   delta,
   icon: Icon,
   iconClassName,
+  footer,
 }: {
   label: string;
   value: string;
@@ -158,6 +179,7 @@ function StatCard({
   delta?: number | null;
   icon: LucideIcon;
   iconClassName: string;
+  footer?: string;
 }) {
   return (
     <Card size="sm">
@@ -179,6 +201,7 @@ function StatCard({
               </span>
             )}
           </span>
+          {footer && <span className="text-xs text-muted-foreground">{footer}</span>}
         </div>
         <div
           className={cn(
@@ -373,6 +396,8 @@ export function SalesView({
 
   const avgSalesMargin = salesMargin(totalValue, totalCost);
 
+  const monthProfitForecast = useMemo(() => currentMonthProfitForecast(sales), [sales]);
+
   const previousRange = useMemo(() => previousPeriodRange(dateFrom, dateTo), [dateFrom, dateTo]);
 
   const previousTotals = useMemo(() => {
@@ -470,6 +495,7 @@ export function SalesView({
               delta={percentChange(totalProfit, previousTotals.profit)}
               icon={TrendingUp}
               iconClassName="bg-green-50 text-green-600"
+              footer={`Previsão do mês: ${formatCurrency(monthProfitForecast)}`}
             />
             <StatCard
               label="Margem média"
@@ -557,9 +583,14 @@ export function SalesView({
 
           {/* Mobile: lucro total + filtro */}
           <div className="flex items-center justify-between md:hidden">
-            <span className="text-sm font-medium text-muted-foreground">
-              Lucro total
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-muted-foreground">
+                Lucro total
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Previsão do mês: {formatCurrency(monthProfitForecast)}
+              </span>
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-base font-semibold">
                 {formatCurrency(totalProfit)}

@@ -72,6 +72,32 @@ function currentMonthRange() {
   return { from: toIso(from), to: toIso(to) };
 }
 
+// Projeta o lucro líquido do mês corrente inteiro a partir do ritmo até hoje
+// (lucro de vendas menos despesas acumulados / dias já passados * dias
+// totais do mês). Independe dos filtros de período escolhidos pelo usuário.
+function currentMonthProfitForecast(sales: CfMotoSale[], expenses: CfMotoExpense[]) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysElapsed = now.getDate();
+  const toIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const from = toIso(monthStart);
+  const to = toIso(now);
+
+  const salesProfitSoFar = sales
+    .filter((sale) => sale.status !== "cancelado" && sale.sale_date >= from && sale.sale_date <= to)
+    .reduce((acc, sale) => acc + profitOf(sale), 0);
+
+  const expensesSoFar = expenses
+    .filter((expense) => !(expense.end_date < from) && !(expense.start_date > to))
+    .reduce((acc, expense) => acc + expense.amount, 0);
+
+  const netSoFar = salesProfitSoFar - expensesSoFar;
+
+  return daysElapsed > 0 ? (netSoFar / daysElapsed) * daysInMonth : 0;
+}
+
 export function CfMotosVendasView({
   sales,
   expenses,
@@ -153,6 +179,11 @@ export function CfMotosVendasView({
 
   const totalExpenses = filteredExpenses.reduce((acc, expense) => acc + expense.amount, 0);
   const netProfit = totalProfit - totalExpenses;
+
+  const monthProfitForecast = useMemo(
+    () => currentMonthProfitForecast(sales, expenses),
+    [sales, expenses],
+  );
 
   const activeFiltersCount = [
     dateFrom !== defaultRange.from ? dateFrom : "",
@@ -245,7 +276,12 @@ export function CfMotosVendasView({
 
           {/* Mobile: lucro total + filtro */}
           <div className="flex items-center justify-between md:hidden">
-            <span className="text-sm font-medium text-muted-foreground">Lucro total</span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-muted-foreground">Lucro total</span>
+              <span className="text-xs text-muted-foreground">
+                Previsão do mês: {formatCurrency(monthProfitForecast)}
+              </span>
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-base font-semibold">{formatCurrency(netProfit)}</span>
               <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
@@ -339,8 +375,13 @@ export function CfMotosVendasView({
                   Lucro
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-xl font-semibold md:text-2xl">
-                {formatCurrency(netProfit)}
+              <CardContent className="flex flex-col gap-0.5">
+                <span className="text-xl font-semibold md:text-2xl">
+                  {formatCurrency(netProfit)}
+                </span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  Previsão do mês: {formatCurrency(monthProfitForecast)}
+                </span>
               </CardContent>
             </Card>
             <Card>
