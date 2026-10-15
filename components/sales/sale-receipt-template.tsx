@@ -397,12 +397,32 @@ export const SaleReceiptTemplate = forwardRef<
           </span>
         </div>
 
-        <div style={{ textAlign: "center" }}>
+        <div style={{ position: "relative", textAlign: "center" }}>
           <div style={{ borderBottom: "1.5px solid #111", height: 40 }} />
           <span style={{ fontSize: 14, fontWeight: 600, color: "#333" }}>
             Assinatura / Carimbo
           </span>
           <div style={{ fontSize: 14, fontWeight: 900 }}>AUTO PEÇAS LS</div>
+
+          <div
+            style={{
+              position: "absolute",
+              top: "-10px",
+              right: "6px",
+              transform: "rotate(-14deg)",
+              border: "3px solid " + RED,
+              borderRadius: 8,
+              padding: "4px 14px",
+              color: RED,
+              fontSize: 22,
+              fontWeight: 900,
+              letterSpacing: 2,
+              opacity: 0.85,
+              pointerEvents: "none",
+            }}
+          >
+            PAGO
+          </div>
         </div>
       </div>
 
