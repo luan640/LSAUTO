@@ -146,9 +146,12 @@ export function SaleFormDialog({
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [newCustomerDialogOpen, setNewCustomerDialogOpen] = useState(false);
+  // Venda nova: itens do estoque (padrão) ou avulsa (item sem cadastro em
+  // Produtos, só valor da compra e de venda). Ao editar, o modo vem da venda.
+  const [mode, setMode] = useState<"estoque" | "avulsa">("estoque");
 
   const isEditing = !!sale;
-  const isItemized = !sale || saleItems.length > 0;
+  const isItemized = sale ? saleItems.length > 0 : mode === "estoque";
   const isCancelled = sale?.status === "cancelado";
 
   const productOptions = useMemo<ProductOption[]>(
@@ -199,6 +202,7 @@ export function SaleFormDialog({
   if (syncKey !== lastSyncKey) {
     setLastSyncKey(syncKey);
     if (open) {
+      setMode("estoque");
       setDelivery(sale?.delivery_type ?? "retirada");
       setItems(itemRowsFromSaleItems(saleItems, productOptions));
       setItemCosts(initialItemCosts(saleItems));
@@ -293,6 +297,7 @@ export function SaleFormDialog({
     formData.set("sale_value", String(totalValue));
     formData.set("discount", String(discountNumber));
     formData.set("customer_id", customer.value);
+    if (!isEditing) formData.set("sale_mode", mode);
 
     if (isItemized) {
       const validItems = items.filter(
@@ -393,7 +398,9 @@ export function SaleFormDialog({
               <DialogTitle>{isEditing ? "Editar venda" : "Nova venda"}</DialogTitle>
               <DialogDescription>
                 {isCancelled
-                  ? "Venda cancelada — o item já retornou ao estoque."
+                  ? isItemized
+                    ? "Venda cancelada — o item já retornou ao estoque."
+                    : "Venda cancelada."
                   : "O frete não é cobrado do cliente."}
               </DialogDescription>
             </div>
@@ -543,6 +550,40 @@ export function SaleFormDialog({
               </CardContent>
             </Card>
 
+            {!isEditing && (
+              <Card size="sm">
+                <CardContent className="flex flex-col gap-2">
+                  <Label>Itens da venda</Label>
+                  <RadioGroup
+                    value={mode}
+                    onValueChange={(value) => setMode(value as "estoque" | "avulsa")}
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                  >
+                    <RadioGroupItem
+                      value="estoque"
+                      className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
+                    >
+                      <Package className="size-4 text-muted-foreground" />
+                      Produtos do estoque
+                    </RadioGroupItem>
+                    <RadioGroupItem
+                      value="avulsa"
+                      className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
+                    >
+                      <ShoppingCart className="size-4 text-muted-foreground" />
+                      Venda avulsa (sem cadastro)
+                    </RadioGroupItem>
+                  </RadioGroup>
+                  {mode === "avulsa" && (
+                    <p className="text-xs text-muted-foreground">
+                      Para itens que não estão em Produtos: informe só o valor da compra e o de
+                      venda. Não altera o estoque.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {isItemized ? (
               <Card size="sm">
                 <CardContent className="flex flex-col gap-3">
@@ -659,7 +700,7 @@ export function SaleFormDialog({
             ) : (
               <>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="cost">Custo da venda (R$)</Label>
+                  <Label htmlFor="cost">Valor da compra (R$)</Label>
                   <Input
                     id="cost"
                     name="cost"
@@ -669,17 +710,23 @@ export function SaleFormDialog({
                     required
                     defaultValue={sale?.cost ?? ""}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Quanto a peça custou. Usado no cálculo do lucro.
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="products">Produtos vendidos</Label>
+                  <Label htmlFor="products">Descrição dos itens (opcional)</Label>
                   <Textarea
                     id="products"
                     name="products"
-                    placeholder="Cole aqui a lista de produtos vendidos"
-                    rows={4}
+                    placeholder="Ex.: 1x Pastilha de freio dianteira"
+                    rows={3}
                     defaultValue={sale?.products ?? ""}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Sai no recibo. Um item por linha; use &quot;2x&quot; no início para a quantidade.
+                  </p>
                 </div>
               </>
             )}

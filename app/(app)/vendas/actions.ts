@@ -233,6 +233,25 @@ export async function createSale(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Venda avulsa: item que não está cadastrado em Produtos. Grava só o valor da
+  // compra (custo) e o de venda informados à mão; não mexe no estoque.
+  if (formData.get("sale_mode") === "avulsa") {
+    const sale = parseSaleInput(formData);
+    if (!Number.isFinite(sale.cost) || sale.cost < 0) {
+      throw new Error("Informe o valor da compra");
+    }
+    sale.products = sale.products.trim();
+
+    const { error } = await supabase.from("sales").insert({ ...sale, created_by: user?.id });
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    revalidatePath("/vendas");
+    revalidatePath("/dashboard");
+    return;
+  }
+
   const items = parseSaleItems(formData);
   if (items.length === 0) {
     throw new Error("Selecione ao menos um produto do estoque e a quantidade");
