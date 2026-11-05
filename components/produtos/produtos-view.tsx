@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +20,10 @@ import {
 } from "@/components/ui/table";
 import { ProductFormDialog } from "./product-form-dialog";
 import type { LsBrand, LsProduct } from "@/lib/types";
+
+function formatDateTime(isoDate: string) {
+  return format(parseISO(isoDate), "dd/MM/yyyy HH:mm", { locale: ptBR });
+}
 
 export function ProdutosView({
   products,
@@ -122,7 +128,7 @@ export function ProdutosView({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">
-                      {product.brand?.name ?? "—"}
+                      {product.brand?.name ?? "—"} · {formatDateTime(product.created_at)}
                     </span>
                     {!product.active && (
                       <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
@@ -143,6 +149,7 @@ export function ProdutosView({
                   <TableHead>Nome</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Marca</TableHead>
+                  <TableHead>Registrado em</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -156,6 +163,7 @@ export function ProdutosView({
                     <TableCell>{product.name}</TableCell>
                     <TableCell>{product.sku}</TableCell>
                     <TableCell>{product.brand?.name ?? "—"}</TableCell>
+                    <TableCell>{formatDateTime(product.created_at)}</TableCell>
                     <TableCell>
                       {product.active ? (
                         "Ativo"
