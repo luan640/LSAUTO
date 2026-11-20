@@ -23,6 +23,27 @@ alter table public.sales
 alter table public.sales
   add constraint sales_status_check check (status in ('finalizado', 'cancelado'));
 
+-- Origem da venda: veio de anúncio pago ou foi orgânica. Vendas antigas ficam como 'anuncio'.
+alter table public.sales
+  add column if not exists sale_origin text not null default 'anuncio';
+alter table public.sales
+  drop constraint if exists sales_sale_origin_check;
+alter table public.sales
+  add constraint sales_sale_origin_check check (sale_origin in ('organico', 'anuncio'));
+
+-- Entrega: tipo Uber Flash, valor pago pela entrega e se foi cobrado do cliente.
+-- O valor da entrega sempre entra em cost; quando cobrado, também entra em sale_value.
+alter table public.sales drop constraint if exists sales_delivery_type_check;
+alter table public.sales
+  add constraint sales_delivery_type_check check (delivery_type in ('retirada', 'frete', 'uber_flash'));
+alter table public.sales
+  add column if not exists delivery_fee numeric(10, 2) not null default 0;
+alter table public.sales drop constraint if exists sales_delivery_fee_check;
+alter table public.sales
+  add constraint sales_delivery_fee_check check (delivery_fee >= 0);
+alter table public.sales
+  add column if not exists delivery_charged boolean not null default false;
+
 alter table public.sales
   add column if not exists cancel_reason text not null default '';
 

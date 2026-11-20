@@ -46,7 +46,7 @@ import {
 import { DateInput } from "@/components/ui/date-input";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Expense, Sale } from "@/lib/types";
+import { DELIVERY_TYPE_LABELS, type Expense, type Sale } from "@/lib/types";
 
 const PERIODS = {
   hoje: "Hoje",
@@ -286,7 +286,7 @@ export function DashboardView({
   const byDelivery = useMemo(() => {
     const map = new Map<string, number>();
     for (const sale of filtered) {
-      const label = sale.delivery_type === "frete" ? "Frete" : "Retirada";
+      const label = DELIVERY_TYPE_LABELS[sale.delivery_type] ?? "Retirada";
       map.set(label, (map.get(label) ?? 0) + 1);
     }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));

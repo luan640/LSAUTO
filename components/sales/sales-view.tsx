@@ -61,6 +61,8 @@ import { SaleFormDialog } from "./sale-form-dialog";
 import { SaleReceiptTemplate } from "./sale-receipt-template";
 import {
   PAYMENT_METHODS,
+  DELIVERY_TYPE_LABELS,
+  SALE_ORIGIN_LABELS,
   type LsCustomer,
   type LsSaleItem,
   type LsStockSummary,
@@ -154,6 +156,24 @@ function windowedPages(current: number, total: number, size = 5) {
   const end = Math.min(total, start + size - 1);
   start = Math.max(1, end - size + 1);
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+const SALE_ORIGIN_BADGE_CLASSNAMES: Record<Sale["sale_origin"], string> = {
+  anuncio: "bg-sky-50 text-sky-700",
+  organico: "bg-violet-50 text-violet-700",
+};
+
+function OriginBadge({ origin }: { origin: Sale["sale_origin"] }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        SALE_ORIGIN_BADGE_CLASSNAMES[origin] ?? SALE_ORIGIN_BADGE_CLASSNAMES.anuncio,
+      )}
+    >
+      {SALE_ORIGIN_LABELS[origin] ?? SALE_ORIGIN_LABELS.anuncio}
+    </span>
+  );
 }
 
 function StatusBadge({ status }: { status: Sale["status"] }) {
@@ -730,10 +750,11 @@ export function SalesView({
                   {sale.customer?.name && (
                     <span className="text-sm text-muted-foreground">{sale.customer.name}</span>
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <OriginBadge origin={sale.sale_origin} />
                     <Badge variant="secondary">{sale.payment_method}</Badge>
                     <Badge variant="outline">
-                      {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
+                      {DELIVERY_TYPE_LABELS[sale.delivery_type] ?? "Retirada"}
                     </Badge>
                     <StatusBadge status={sale.status} />
                   </div>
@@ -788,6 +809,7 @@ export function SalesView({
                     </button>
                   </TableHead>
                   <TableHead className="text-base text-muted-foreground">Cliente</TableHead>
+                  <TableHead className="text-base text-muted-foreground">Origem</TableHead>
                   <TableHead className="text-base text-muted-foreground">Valor</TableHead>
                   <TableHead className="text-base text-muted-foreground">Desconto</TableHead>
                   <TableHead className="text-base text-muted-foreground">Pagamento</TableHead>
@@ -812,11 +834,14 @@ export function SalesView({
                     >
                       <TableCell>{formatDate(sale.sale_date)}</TableCell>
                       <TableCell>{sale.customer?.name ?? "—"}</TableCell>
+                      <TableCell>
+                        <OriginBadge origin={sale.sale_origin} />
+                      </TableCell>
                       <TableCell>{formatCurrency(sale.sale_value)}</TableCell>
                       <TableCell>{sale.discount ? formatCurrency(sale.discount) : "—"}</TableCell>
                       <TableCell>{sale.payment_method}</TableCell>
                       <TableCell>
-                        {sale.delivery_type === "frete" ? "Frete" : "Retirada"}
+                        {DELIVERY_TYPE_LABELS[sale.delivery_type] ?? "Retirada"}
                       </TableCell>
                       <TableCell>{formatCurrency(sale.cost)}</TableCell>
                       <TableCell>
@@ -867,7 +892,7 @@ export function SalesView({
               <TableFooter>
                 <TableRow>
                   <TableCell>Total</TableCell>
-                  <TableCell />
+                  <TableCell colSpan={2} />
                   <TableCell>{formatCurrency(totalValue)}</TableCell>
                   <TableCell>{formatCurrency(totalDiscount)}</TableCell>
                   <TableCell colSpan={2} />

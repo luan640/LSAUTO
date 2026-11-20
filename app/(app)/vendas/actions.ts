@@ -2,19 +2,46 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { SaleInput } from "@/lib/types";
+import type { DeliveryType, SaleInput, SaleOrigin } from "@/lib/types";
+import { DELIVERY_TYPES, SALE_ORIGINS } from "@/lib/types";
 import { computeLifoCosts, type LedgerEvent } from "@/lib/stock/lifo-cost";
 
 function parseSaleInput(formData: FormData): SaleInput {
   const customerId = String(formData.get("customer_id") ?? "");
+  const saleOrigin = String(formData.get("sale_origin") ?? "");
+
+  if (!(SALE_ORIGINS as readonly string[]).includes(saleOrigin)) {
+    throw new Error("Informe se a venda veio de anúncio ou foi orgânica");
+  }
+
+  const deliveryType = String(formData.get("delivery_type") ?? "");
+  if (!(DELIVERY_TYPES as readonly string[]).includes(deliveryType)) {
+    throw new Error("Tipo de entrega inválido");
+  }
+
+  // Retirada não tem custo de entrega. Nos outros tipos, o valor pago pela entrega
+  // sempre entra no custo da venda; se foi cobrado do cliente, entra também no
+  // valor da venda (e o lucro fica igual ao de uma retirada).
+  const isPickup = deliveryType === "retirada";
+  const deliveryFee = isPickup ? 0 : Number(formData.get("delivery_fee")) || 0;
+  const deliveryCharged = !isPickup && formData.get("delivery_charged") === "true";
+
+  if (deliveryFee < 0) {
+    throw new Error("O valor da entrega não pode ser negativo");
+  }
 
   return {
+    sale_origin: saleOrigin as SaleOrigin,
     sale_date: String(formData.get("sale_date")),
-    sale_value: Number(formData.get("sale_value")),
+    // sale_value do formulário é o valor dos produtos já com desconto.
+    sale_value: Number(formData.get("sale_value")) + (deliveryCharged ? deliveryFee : 0),
     discount: Number(formData.get("discount")) || 0,
     payment_method: String(formData.get("payment_method")) as SaleInput["payment_method"],
-    delivery_type: String(formData.get("delivery_type")) as SaleInput["delivery_type"],
-    cost: Number(formData.get("cost")) || 0,
+    delivery_type: deliveryType as DeliveryType,
+    delivery_fee: deliveryFee,
+    delivery_charged: deliveryCharged,
+    // Em vendas sem itens (modelo antigo) o custo dos produtos vem do formulário.
+    cost: (Number(formData.get("cost")) || 0) + deliveryFee,
     products: String(formData.get("products") ?? ""),
     notes: String(formData.get("notes") ?? ""),
     receipt_notes: String(formData.get("receipt_notes") ?? ""),
@@ -266,7 +293,7 @@ export async function createSale(formData: FormData) {
   );
 
   const sale = parseSaleInput(formData);
-  sale.cost = computedCost;
+  sale.cost = computedCost + sale.delivery_fee;
   sale.products = await buildProductsSummary(supabase, items);
 
   const { data: inserted, error } = await supabase
@@ -302,7 +329,9 @@ export async function updateSale(id: string, formData: FormData) {
     const itemsWithCost = await buildSaleItemsWithCost(supabase, items, {
       excludeSaleId: id,
     });
-    sale.cost = itemsWithCost.reduce((acc, item) => acc + item.quantity * item.unit_cost, 0);
+    sale.cost =
+      itemsWithCost.reduce((acc, item) => acc + item.quantity * item.unit_cost, 0) +
+      sale.delivery_fee;
     sale.products = await buildProductsSummary(supabase, items);
 
     const { error } = await supabase.from("sales").update(sale).eq("id", id);

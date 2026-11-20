@@ -2,7 +2,24 @@ export const PAYMENT_METHODS = ["Pix", "Cartão", "Dinheiro", "Transferência", 
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export type DeliveryType = "retirada" | "frete";
+export const DELIVERY_TYPES = ["retirada", "frete", "uber_flash"] as const;
+
+export type DeliveryType = (typeof DELIVERY_TYPES)[number];
+
+export const DELIVERY_TYPE_LABELS: Record<DeliveryType, string> = {
+  retirada: "Retirada",
+  frete: "Frete",
+  uber_flash: "Uber Flash",
+};
+
+export const SALE_ORIGINS = ["anuncio", "organico"] as const;
+
+export type SaleOrigin = (typeof SALE_ORIGINS)[number];
+
+export const SALE_ORIGIN_LABELS: Record<SaleOrigin, string> = {
+  anuncio: "Anúncio",
+  organico: "Orgânico",
+};
 
 export const SALE_STATUSES = ["finalizado", "cancelado"] as const;
 
@@ -25,6 +42,10 @@ export type Sale = {
   discount: number;
   payment_method: PaymentMethod;
   delivery_type: DeliveryType;
+  // Valor pago pela entrega. Já está somado em cost; se delivery_charged, também em sale_value.
+  delivery_fee: number;
+  delivery_charged: boolean;
+  sale_origin: SaleOrigin;
   cost: number;
   products: string;
   status: SaleStatus;

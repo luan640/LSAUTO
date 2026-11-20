@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check, Package, Plus, ShoppingCart, Trash2, Truck } from "lucide-react";
+import { Bike, Check, Package, Plus, ShoppingCart, Trash2, Truck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import {
   ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -44,11 +45,23 @@ import {
 import { formatCurrency } from "@/lib/format";
 import {
   PAYMENT_METHODS,
+  DELIVERY_TYPES,
+  DELIVERY_TYPE_LABELS,
+  type DeliveryType,
   type LsCustomer,
   type LsSaleItem,
   type LsStockSummary,
   type Sale,
+  type SaleOrigin,
+  SALE_ORIGINS,
+  SALE_ORIGIN_LABELS,
 } from "@/lib/types";
+
+const DELIVERY_ICONS: Record<DeliveryType, typeof Package> = {
+  retirada: Package,
+  frete: Truck,
+  uber_flash: Bike,
+};
 
 type ProductOption = { value: string; label: string; quantity: number; active: boolean };
 
@@ -68,10 +81,17 @@ function todayISO() {
 
 // O campo "Valor de venda" exibido no formulário é o subtotal (bruto, antes do
 // desconto); sale_value no banco guarda o valor líquido. Ao editar, reconstrói
-// o bruto somando o desconto de volta.
+// o bruto somando o desconto de volta e tirando a entrega cobrada do cliente,
+// que o servidor soma ao sale_value.
 function initialGrossValue(sale: Sale | null): string {
   if (!sale) return "";
-  return String(Number(sale.sale_value) + Number(sale.discount ?? 0));
+  const chargedDelivery = sale.delivery_charged ? Number(sale.delivery_fee) || 0 : 0;
+  return String(Number(sale.sale_value) + Number(sale.discount ?? 0) - chargedDelivery);
+}
+
+function initialDeliveryFee(sale: Sale | null): string {
+  if (!sale || sale.delivery_type === "retirada") return "";
+  return String(Number(sale.delivery_fee) || 0);
 }
 
 function initialDiscount(sale: Sale | null): string {
@@ -136,9 +156,10 @@ export function SaleFormDialog({
   saleItems?: LsSaleItem[];
   customerOptions?: LsCustomer[];
 }) {
-  const [delivery, setDelivery] = useState<"retirada" | "frete">(
-    sale?.delivery_type ?? "retirada",
-  );
+  const [delivery, setDelivery] = useState<DeliveryType>(sale?.delivery_type ?? "retirada");
+  const [deliveryFee, setDeliveryFee] = useState(() => initialDeliveryFee(sale));
+  const [deliveryCharged, setDeliveryCharged] = useState(sale?.delivery_charged ?? false);
+  const [origin, setOrigin] = useState<SaleOrigin | "">(sale?.sale_origin ?? "");
   const [grossValue, setGrossValue] = useState(() => initialGrossValue(sale));
   const [discount, setDiscount] = useState(() => initialDiscount(sale));
   const [isPending, startTransition] = useTransition();
@@ -204,6 +225,9 @@ export function SaleFormDialog({
     if (open) {
       setMode("estoque");
       setDelivery(sale?.delivery_type ?? "retirada");
+      setDeliveryFee(initialDeliveryFee(sale));
+      setDeliveryCharged(sale?.delivery_charged ?? false);
+      setOrigin(sale?.sale_origin ?? "");
       setItems(itemRowsFromSaleItems(saleItems, productOptions));
       setItemCosts(initialItemCosts(saleItems));
       setCustomer(initialCustomer());
@@ -290,11 +314,30 @@ export function SaleFormDialog({
 
   const grossValueNumber = Number(grossValue) || 0;
   const discountNumber = Number(discount) || 0;
-  const totalValue = Math.max(grossValueNumber - discountNumber, 0);
+  const productsValue = Math.max(grossValueNumber - discountNumber, 0);
+
+  const hasDelivery = delivery !== "retirada";
+  const deliveryFeeNumber = hasDelivery ? Number(deliveryFee) || 0 : 0;
+  const chargedDeliveryNumber = hasDelivery && deliveryCharged ? deliveryFeeNumber : 0;
+  const totalValue = productsValue + chargedDeliveryNumber;
 
   function handleSubmit(formData: FormData) {
+    if (!origin) {
+      toast.error("Informe se a venda veio de anúncio ou foi orgânica");
+      return;
+    }
+
+    if (hasDelivery && deliveryFee.trim() === "") {
+      toast.error("Informe o valor pago pela entrega");
+      return;
+    }
+
     formData.set("delivery_type", delivery);
-    formData.set("sale_value", String(totalValue));
+    formData.set("delivery_fee", String(deliveryFeeNumber));
+    formData.set("delivery_charged", String(hasDelivery && deliveryCharged));
+    formData.set("sale_origin", origin);
+    // O servidor soma a entrega cobrada do cliente; aqui vai só o valor dos produtos.
+    formData.set("sale_value", String(productsValue));
     formData.set("discount", String(discountNumber));
     formData.set("customer_id", customer.value);
     if (!isEditing) formData.set("sale_mode", mode);
@@ -384,7 +427,11 @@ export function SaleFormDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setDelivery(sale?.delivery_type ?? "retirada");
+        if (!next) {
+          setDelivery(sale?.delivery_type ?? "retirada");
+          setDeliveryFee(initialDeliveryFee(sale));
+          setDeliveryCharged(sale?.delivery_charged ?? false);
+        }
         onOpenChange(next);
       }}
     >
@@ -401,7 +448,7 @@ export function SaleFormDialog({
                   ? isItemized
                     ? "Venda cancelada — o item já retornou ao estoque."
                     : "Venda cancelada."
-                  : "O frete não é cobrado do cliente."}
+                  : "O valor da entrega entra no custo da venda."}
               </DialogDescription>
             </div>
           </div>
@@ -464,23 +511,68 @@ export function SaleFormDialog({
                 <Label>Entrega</Label>
                 <RadioGroup
                   value={delivery}
-                  onValueChange={(value) => setDelivery(value as "retirada" | "frete")}
+                  onValueChange={(value) => setDelivery(value as DeliveryType)}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                >
+                  {DELIVERY_TYPES.map((value) => {
+                    const Icon = DELIVERY_ICONS[value];
+                    return (
+                      <RadioGroupItem
+                        key={value}
+                        value={value}
+                        className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
+                      >
+                        <Icon className="size-4 text-muted-foreground" />
+                        {DELIVERY_TYPE_LABELS[value]}
+                      </RadioGroupItem>
+                    );
+                  })}
+                </RadioGroup>
+
+                {hasDelivery && (
+                  <div className="grid grid-cols-1 items-end gap-3 pt-1 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="delivery_fee">Valor pago pela entrega (R$)</Label>
+                      <Input
+                        id="delivery_fee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="0,00"
+                        value={deliveryFee}
+                        onChange={(e) => setDeliveryFee(e.target.value)}
+                      />
+                    </div>
+                    <Label className="flex h-9 items-center gap-2 font-normal">
+                      <Checkbox
+                        checked={deliveryCharged}
+                        onCheckedChange={(checked) => setDeliveryCharged(checked === true)}
+                      />
+                      Cobrado do cliente
+                    </Label>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardContent className="flex flex-col gap-2">
+                <Label>Origem da venda</Label>
+                <RadioGroup
+                  value={origin}
+                  onValueChange={(value) => setOrigin(value as SaleOrigin)}
                   className="grid grid-cols-2 gap-2"
                 >
-                  <RadioGroupItem
-                    value="retirada"
-                    className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
-                  >
-                    <Package className="size-4 text-muted-foreground" />
-                    Retirada
-                  </RadioGroupItem>
-                  <RadioGroupItem
-                    value="frete"
-                    className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
-                  >
-                    <Truck className="size-4 text-muted-foreground" />
-                    Frete (não cobrado)
-                  </RadioGroupItem>
+                  {SALE_ORIGINS.map((value) => (
+                    <RadioGroupItem
+                      key={value}
+                      value={value}
+                      className="items-center gap-2 rounded-lg border p-3 font-normal has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
+                    >
+                      {SALE_ORIGIN_LABELS[value]}
+                    </RadioGroupItem>
+                  ))}
                 </RadioGroup>
               </CardContent>
             </Card>
@@ -708,7 +800,9 @@ export function SaleFormDialog({
                     step="0.01"
                     min="0"
                     required
-                    defaultValue={sale?.cost ?? ""}
+                    defaultValue={
+                      sale ? Number(sale.cost) - (Number(sale.delivery_fee) || 0) : ""
+                    }
                   />
                   <p className="text-xs text-muted-foreground">
                     Quanto a peça custou. Usado no cálculo do lucro.
@@ -741,11 +835,17 @@ export function SaleFormDialog({
                 <Card size="sm">
                   <CardContent className="flex flex-col gap-1">
                     <span className="text-xs text-muted-foreground">
-                      Custo total dos itens (R$)
+                      {hasDelivery ? "Custo total (itens + entrega)" : "Custo total dos itens (R$)"}
                     </span>
                     <span className="text-lg font-semibold">
-                      {formatCurrency(computedCost)}
+                      {formatCurrency(computedCost + deliveryFeeNumber)}
                     </span>
+                    {hasDelivery && (
+                      <span className="text-xs text-muted-foreground">
+                        Itens {formatCurrency(computedCost)} · Entrega{" "}
+                        {formatCurrency(deliveryFeeNumber)}
+                      </span>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -772,6 +872,12 @@ export function SaleFormDialog({
                       placeholder="0,00"
                     />
                   </div>
+                  {chargedDeliveryNumber > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Entrega cobrada</span>
+                      <span>{formatCurrency(chargedDeliveryNumber)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
                     <span>Total da venda</span>
                     <span>{formatCurrency(totalValue)}</span>
